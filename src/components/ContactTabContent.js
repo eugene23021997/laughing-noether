@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { contactService } from "../services/contactService";
-import { prospectionService } from "../services/prospectionService"; // Importer le service de prospection
+import { prospectionService } from "../services/prospectionService";
 import ContactList from "./ContactList";
-import SelectedContactsTab from "./SelectedContactsTab"; // Importer le nouvel onglet
+import SelectedContactsTab from "./SelectedContactsTab";
 import LoadingSpinner from "./LoadingSpinner";
+// Notez qu'il n'y a plus d'import XLSX ici - nous utiliserons le lazy loading
 
 // Stockage local pour les contacts importés (persistance entre les changements d'onglets)
 let storedImportedContacts = [];
@@ -101,7 +102,7 @@ const ContactTabContent = ({
     setSelectedContact(contact);
   };
 
-  // Importer des contacts depuis un fichier
+  // Importer des contacts depuis un fichier avec lazy loading
   const importExcelContacts = useCallback(
     async (file) => {
       setImportLoading(true);
@@ -112,6 +113,8 @@ const ContactTabContent = ({
         if (!(file instanceof File)) {
           throw new Error("Le paramètre fourni n'est pas un fichier valide");
         }
+
+        console.log("Importation du fichier:", file.name, file.type);
 
         // Importer les contacts depuis le fichier
         const importedContacts = await contactService.importContacts(file);
