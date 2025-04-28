@@ -918,20 +918,14 @@ class ContactService {
   }
 
   /**
-   * Les méthodes suivantes sont conservées de la version précédente
-   * Avec quelques modifications pour améliorer la robustesse
-   */
-
-  /**
    * Importe des contacts depuis un fichier Excel, CSV ou autre format
+   * Utilisation du lazy loading pour charger XLSX uniquement quand nécessaire
    * @param {File} file - L'objet File à importer
    * @returns {Promise<Array>} - Les contacts importés
    */
   async importContacts(file) {
     try {
-      console.log(
-        `Tentative d'importation du fichier: ${file.name} (type: ${file.type})`
-      );
+      console.log(`Tentative d'importation du fichier: ${file.name} (type: ${file.type})`);
 
       // Vérifier que nous avons bien un fichier
       if (!file || !(file instanceof File)) {
@@ -1063,13 +1057,17 @@ class ContactService {
   }
 
   /**
-   * Importe des contacts depuis un fichier Excel
+   * Importe des contacts depuis un fichier Excel avec lazy loading
    * @param {File} file - L'objet File Excel
    * @returns {Promise<Array>} - Les contacts importés
    */
   async _importExcel(file) {
     try {
       console.log("Début de l'importation Excel pour:", file.name);
+
+      // Chargement dynamique de la bibliothèque XLSX
+      const XLSX = await import('xlsx');
+      console.log("Bibliothèque XLSX chargée avec succès");
 
       // Lire le fichier comme ArrayBuffer
       const arrayBuffer = await this._readFileAsArrayBuffer(file);
@@ -1278,9 +1276,37 @@ class ContactService {
   }
 
   /**
-   * Méthode pour mieux analyser les en-têtes Excel ou CSV
+   * Méthode utilitaire pour lire un fichier comme texte
+   * @param {File} file - Le fichier à lire
+   * @returns {Promise<string>} - Le contenu du fichier
+   */
+  _readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Méthode utilitaire pour lire un fichier comme ArrayBuffer
+   * @param {File} file - Le fichier à lire
+   * @returns {Promise<ArrayBuffer>} - Le contenu du fichier
+   */
+  _readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /**
+   * Méthode pour créer un mappage des en-têtes de colonnes
    * @param {Array} headers - Les en-têtes du fichier
-   * @returns {Object} - Mappages des en-têtes vers les indices de colonnes
+   * @returns {Object} - Mappage des en-têtes aux indices de colonnes
    */
   _createHeaderMap(headers) {
     const headerMap = {
@@ -1410,34 +1436,6 @@ class ContactService {
 
     console.log("Mappage d'en-têtes détecté:", headerMap);
     return headerMap;
-  }
-
-  /**
-   * Méthode utilitaire pour lire un fichier comme texte
-   * @param {File} file - Le fichier à lire
-   * @returns {Promise<string>} - Le contenu du fichier
-   */
-  _readFileAsText(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
-      reader.readAsText(file);
-    });
-  }
-
-  /**
-   * Méthode utilitaire pour lire un fichier comme ArrayBuffer
-   * @param {File} file - Le fichier à lire
-   * @returns {Promise<ArrayBuffer>} - Le contenu du fichier
-   */
-  _readFileAsArrayBuffer(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
-      reader.readAsArrayBuffer(file);
-    });
   }
 
   /**
