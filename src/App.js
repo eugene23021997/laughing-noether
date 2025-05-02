@@ -275,7 +275,6 @@ const App = () => {
     fetchRssNews();
   }, [data]);
 
-  // Récupération des actualités RSS
   const fetchRssNews = async () => {
     setIsLoadingRss(true);
     try {
@@ -293,10 +292,13 @@ const App = () => {
       // Mettre à jour la date de dernière mise à jour
       setLastRssUpdate(new Date());
 
-      // Extraire les contacts des actualités si disponible
-      if (data.schneiderNews) {
-        const extractedContacts = [];
-        // Logique d'extraction des contacts...
+      // Extraire les contacts des actualités (CORRECTION ICI)
+      if (news && news.length > 0) {
+        // On utilise directement le service contactService pour extraire les contacts
+        // en fonction des actualités spécifiques à chaque offre
+        const extractedContacts = contactService.extractContactsFromNews(news);
+
+        // Stocker les contacts dans l'état
         setContacts(extractedContacts);
       }
     } catch (error) {
