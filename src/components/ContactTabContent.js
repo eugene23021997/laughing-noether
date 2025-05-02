@@ -4,22 +4,10 @@ import { prospectionService } from "../services/prospectionService";
 import ContactList from "./ContactList";
 import SelectedContactsTab from "./SelectedContactsTab";
 import LoadingSpinner from "./LoadingSpinner";
-// Pas besoin d'importer XLSX ici, il est géré dans contactService
 
 // Stockage local pour les contacts importés (persistance entre les changements d'onglets)
 let storedImportedContacts = [];
 
-/**
- * Composant de gestion des contacts pour l'onglet Contacts
- * Permet l'extraction, l'import et l'analyse des contacts
- * Intègre le nouvel onglet "Contacts sélectionnés" pour les opportunités de prospection
- * @param {Object} props - Propriétés du composant
- * @param {Array} props.combinedRelevanceMatrix - Matrice combinée de pertinence des actualités
- * @param {Object} props.data - Données de l'application
- * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
- * @param {Object} props.opportunitiesByOffering - Opportunités existantes par offre
- * @returns {JSX.Element} Onglet de gestion des contacts
- */
 const ContactTabContent = ({
   combinedRelevanceMatrix,
   data,
@@ -65,8 +53,8 @@ const ContactTabContent = ({
       setLoading(true);
       // Extraire les contacts des actualités Schneider Electric
       const newsItems = [
-        ...data.schneiderNews,
-        ...combinedRelevanceMatrix.map((item) => ({
+        ...(data.schneiderNews || []),
+        ...(combinedRelevanceMatrix || []).map((item) => ({
           title: item.news,
           description: item.newsDescription || "",
           date: item.newsDate,
@@ -78,7 +66,7 @@ const ContactTabContent = ({
         contactService.extractContactsFromNews(newsItems);
 
       // Identifier les rôles manquants
-      const roles = contactService.identifyRolesInNews(combinedRelevanceMatrix);
+      const roles = contactService.identifyRolesInNews(combinedRelevanceMatrix || []);
       const rolesToContacts = contactService.matchContactsToRoles(
         extractedContacts,
         roles
@@ -122,7 +110,7 @@ const ContactTabContent = ({
         // Analyser la pertinence des contacts importés
         const relevanceAnalysis = contactService.analyzeContactRelevance(
           importedContacts,
-          combinedRelevanceMatrix
+          combinedRelevanceMatrix || []
         );
 
         // Stocker les contacts importés à la fois dans l'état local et dans la variable globale
@@ -131,7 +119,7 @@ const ContactTabContent = ({
 
         // Identifier les rôles manquants
         const roles = contactService.identifyRolesInNews(
-          combinedRelevanceMatrix
+          combinedRelevanceMatrix || []
         );
         const rolesToContacts = contactService.matchContactsToRoles(
           relevanceAnalysis,
@@ -190,7 +178,7 @@ const ContactTabContent = ({
 
     // Identifier les opportunités potentielles de prospection
     const potentialOpportunities = prospectionService.identifyNewOpportunities(
-      combinedRelevanceMatrix,
+      combinedRelevanceMatrix || [],
       opportunitiesByOffering
     );
 
@@ -475,7 +463,7 @@ const ContactTabContent = ({
               {selectedContact.email && (
                 <div className="contact-details-info">
                   <label>Email</label>
-                  <a
+                  
                     href={`mailto:${selectedContact.email}`}
                     className="contact-details-email"
                   >
@@ -487,7 +475,7 @@ const ContactTabContent = ({
               {selectedContact.phone && (
                 <div className="contact-details-info">
                   <label>Téléphone</label>
-                  <a
+                  
                     href={`tel:${selectedContact.phone}`}
                     className="contact-details-phone"
                   >
@@ -505,7 +493,7 @@ const ContactTabContent = ({
                       {selectedContact.sources.map((source, idx) => (
                         <li key={idx} className="contact-source-item">
                           {source.link ? (
-                            <a
+                            
                               href={source.link}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -561,7 +549,7 @@ const ContactTabContent = ({
 
               {/* Actions */}
               <div className="contact-details-actions">
-                <a
+                
                   href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
                     selectedContact.fullName || selectedContact.name
                   )}`}
@@ -607,7 +595,7 @@ const ContactTabContent = ({
                 </a>
 
                 {selectedContact.email && (
-                  <a
+                  
                     href={`mailto:${selectedContact.email}`}
                     className="email-button"
                   >
