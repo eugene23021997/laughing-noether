@@ -4,7 +4,7 @@ import { prospectionService } from "../services/prospectionService";
 import ContactList from "./ContactList";
 import SelectedContactsTab from "./SelectedContactsTab";
 import LoadingSpinner from "./LoadingSpinner";
-// Notez qu'il n'y a plus d'import XLSX ici - nous utiliserons le lazy loading
+// Pas besoin d'importer XLSX ici, il est géré dans contactService
 
 // Stockage local pour les contacts importés (persistance entre les changements d'onglets)
 let storedImportedContacts = [];
@@ -102,7 +102,7 @@ const ContactTabContent = ({
     setSelectedContact(contact);
   };
 
-  // Importer des contacts depuis un fichier avec lazy loading
+  // Importer des contacts depuis un fichier avec la version améliorée
   const importExcelContacts = useCallback(
     async (file) => {
       setImportLoading(true);
@@ -116,7 +116,7 @@ const ContactTabContent = ({
 
         console.log("Importation du fichier:", file.name, file.type);
 
-        // Importer les contacts depuis le fichier
+        // Importer les contacts depuis le fichier avec la méthode améliorée
         const importedContacts = await contactService.importContacts(file);
 
         // Analyser la pertinence des contacts importés
@@ -177,7 +177,7 @@ const ContactTabContent = ({
     (event) => {
       const file = event.target.files[0];
       if (file) {
-        // Passer l'objet File directement, pas juste le nom
+        // Passer l'objet File directement
         importExcelContacts(file);
       }
     },
@@ -296,10 +296,14 @@ const ContactTabContent = ({
       </div>
 
       {/* Chargement */}
-      {(loading || isLoadingRss) && (
+      {(loading || isLoadingRss || importLoading) && (
         <div className="premium-loading-overlay">
           <LoadingSpinner size="large" />
-          <p>Extraction et analyse des contacts en cours...</p>
+          <p>
+            {importLoading
+              ? "Importation des contacts en cours..."
+              : "Extraction et analyse des contacts en cours..."}
+          </p>
         </div>
       )}
 
@@ -308,7 +312,7 @@ const ContactTabContent = ({
         className={`contacts-layout ${selectedContact ? "with-details" : ""}`}
       >
         {/* Contenu des onglets */}
-        {!loading && !isLoadingRss && (
+        {!loading && !isLoadingRss && !importLoading && (
           <div className="contacts-main-content">
             {activeTab === "extracted" && (
               <ContactList
@@ -331,7 +335,7 @@ const ContactTabContent = ({
               <SelectedContactsTab
                 contacts={allContacts}
                 selectedOpportunities={selectedOpportunities}
-                isLoading={loading || isLoadingRss}
+                isLoading={loading || isLoadingRss || importLoading}
               />
             )}
 
