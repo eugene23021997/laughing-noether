@@ -41,7 +41,7 @@ const STANDARD_ROLES = [
   "Responsable Commercial",
   "Responsable Achats",
   "Chef de Produit",
-  "Autre"
+  "Autre",
 ];
 
 /**
@@ -127,32 +127,45 @@ class ContactService {
     }
   }
 
-  /**
-   * Extrait les contacts à partir d'actualités
-   * @param {Array} news - Les actualités à analyser
-   * @returns {Array} - Les contacts extraits
-   */
-  extractContactsFromNews(news) {
-    const allContacts = [];
+/**
+ * Extrait les contacts à partir d'actualités
+ * @param {Array} news - Les actualités à analyser
+ * @returns {Array} - Les contacts extraits
+ */
+extractContactsFromNews(news) {
+  const allContacts = [];
+  const processedSources = new Set(); // Pour éviter de traiter plusieurs fois la même source
 
-    news.forEach((item) => {
-      const text = `${item.title || ""} ${item.description || ""}`;
-      const contacts = this.extractContacts(text);
+  news.forEach((item) => {
+    // Éviter de traiter plusieurs fois la même source
+    const sourceIdentifier = item.title + (item.date || "");
+    if (processedSources.has(sourceIdentifier)) {
+      return;
+    }
+    processedSources.add(sourceIdentifier);
 
-      // Ajouter la source aux contacts
-      contacts.forEach((contact) => {
-        contact.source = {
-          title: item.title || "",
-          date: item.date || "",
-          url: item.link || "",
-        };
+    const text = `${item.title || ""} ${item.description || ""}`;
+    const contacts = this.extractContacts(text);
 
-        allContacts.push(contact);
-      });
+    // Ajouter la source aux contacts
+    contacts.forEach((contact) => {
+      contact.source = {
+        title: item.title || "",
+        date: item.date || "",
+        link: item.link || "",
+      };
+      
+      // Associer explicitement à l'offre pertinente via la source
+      if (item.category) {
+        contact.offerCategory = item.category;
+      }
+
+      allContacts.push(contact);
     });
+  });
 
-    return this._deduplicateContacts(allContacts);
-  }
+  return this._deduplicateContacts(allContacts);
+}
 
   /**
    * Déduplique les contacts extraits
@@ -163,7 +176,14 @@ class ContactService {
     const contactMap = new Map();
 
     contacts.forEach((contact) => {
-      const key = contact.name.toLowerCase();
+      const key = contact.name
+        ? contact.name.toLowerCase()
+        : contact.fullName
+        ? contact.fullName.toLowerCase()
+        : "";
+
+      // Si le nom est vide, ignorer ce contact
+      if (!key) return;
 
       if (contactMap.has(key)) {
         const existing = contactMap.get(key);
@@ -171,18 +191,64 @@ class ContactService {
         // Garder le score de confiance le plus élevé
         if (contact.confidenceScore > existing.confidenceScore) {
           existing.confidenceScore = contact.confidenceScore;
+        }
+
+        // Si le rôle du contact actuel est plus précis (plus long), le conserver
+        if (
+          contact.role &&
+          (!existing.role || contact.role.length > existing.role.length)
+        ) {
           existing.role = contact.role;
         }
 
-        // Ajouter la source
+        // Fusionner les sources sans dupliquer
         if (!existing.sources) existing.sources = [];
-        existing.sources.push(contact.source);
+        if (contact.source) {
+          // Vérifier si la source existe déjà (par titre)
+          const sourceExists = existing.sources.some(
+            (s) => s.title === contact.source.title
+          );
+          if (!sourceExists) {
+            existing.sources.push(contact.source);
+          }
+        } else if (contact.sources) {
+          // Fusionner les tableaux de sources en évitant les doublons
+          contact.sources.forEach((newSource) => {
+            const sourceExists = existing.sources.some(
+              (s) => s.title === newSource.title
+            );
+            if (!sourceExists) {
+              existing.sources.push(newSource);
+            }
+          });
+        }
+
+        // Conserver les autres informations si elles sont plus complètes
+        if (contact.department && !existing.department) {
+          existing.department = contact.department;
+        }
+
+        if (contact.email && !existing.email) {
+          existing.email = contact.email;
+        }
+
+        if (contact.phone && !existing.phone) {
+          existing.phone = contact.phone;
+        }
+
+        if (contact.company && !existing.company) {
+          existing.company = contact.company;
+        }
       } else {
-        contactMap.set(key, {
+        // Nouveau contact
+        const newContact = {
           ...contact,
-          sources: [contact.source],
-        });
-        delete contactMap.get(key).source;
+          sources: contact.source ? [contact.source] : contact.sources || [],
+        };
+        // Supprimer la propriété source individuelle si elle existe
+        if (newContact.source) delete newContact.source;
+
+        contactMap.set(key, newContact);
       }
     });
 
@@ -196,7 +262,9 @@ class ContactService {
    */
   async importContacts(file) {
     try {
-      console.log(`Tentative d'importation du fichier: ${file.name} (type: ${file.type})`);
+      console.log(
+        `Tentative d'importation du fichier: ${file.name} (type: ${file.type})`
+      );
 
       // Vérifier que nous avons bien un fichier
       if (!file || !(file instanceof File)) {
@@ -208,7 +276,7 @@ class ContactService {
       console.log("Fichier lu avec succès, taille:", fileContent.byteLength);
 
       // Charger dynamiquement XLSX
-      const XLSX = await import('xlsx');
+      const XLSX = await import("xlsx");
       console.log("Bibliothèque XLSX chargée avec succès");
 
       // Lire le fichier Excel avec TOUTES les options
@@ -218,19 +286,23 @@ class ContactService {
         cellNF: true,
         cellStyles: true,
         cellFormulas: true,
-        sheetStubs: true
+        sheetStubs: true,
       });
 
       // Vérifier que le workbook existe
-      if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+      if (
+        !workbook ||
+        !workbook.SheetNames ||
+        workbook.SheetNames.length === 0
+      ) {
         throw new Error("Format de fichier Excel non valide ou vide");
       }
 
       console.log("Feuilles disponibles:", workbook.SheetNames);
 
       // Chercher l'onglet CRM_Contacts ou utiliser le premier
-      const sheetName = workbook.SheetNames.includes('CRM_Contacts') 
-        ? 'CRM_Contacts' 
+      const sheetName = workbook.SheetNames.includes("CRM_Contacts")
+        ? "CRM_Contacts"
         : workbook.SheetNames[0];
 
       console.log("Utilisation de la feuille:", sheetName);
@@ -246,18 +318,18 @@ class ContactService {
       // Obtenir les en-têtes depuis la première ligne
       const headers = [];
       const range = XLSX.utils.decode_range(worksheet["!ref"]);
-      
+
       for (let c = range.s.c; c <= range.e.c; c++) {
-        const cellAddress = XLSX.utils.encode_cell({r: range.s.r, c});
+        const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c });
         const cell = worksheet[cellAddress];
         if (cell && cell.v) {
           headers.push({
             col: XLSX.utils.encode_col(c),
-            value: cell.v.toString()
+            value: cell.v.toString(),
           });
         }
       }
-      
+
       console.log("En-têtes détectés:", headers);
 
       // Créer un mappage des colonnes importantes
@@ -269,28 +341,30 @@ class ContactService {
         email: null,
         phone: null,
         company: null,
-        department: null
+        department: null,
       };
 
       // Mapper les colonnes en fonction des en-têtes
-      headers.forEach(header => {
+      headers.forEach((header) => {
         const headerValue = header.value.toLowerCase();
-        
-        if (headerValue === 'full name') columnMap.fullName = header.col;
-        else if (headerValue === 'first name') columnMap.firstName = header.col;
-        else if (headerValue === 'last name') columnMap.lastName = header.col;
-        else if (headerValue === 'role') columnMap.role = header.col;
-        else if (headerValue === 'email') columnMap.email = header.col;
-        else if (headerValue === 'phone') columnMap.phone = header.col;
-        else if (headerValue === '_be_accountname' || headerValue === 'account') columnMap.company = header.col;
-        else if (headerValue === 'department') columnMap.department = header.col;
+
+        if (headerValue === "full name") columnMap.fullName = header.col;
+        else if (headerValue === "first name") columnMap.firstName = header.col;
+        else if (headerValue === "last name") columnMap.lastName = header.col;
+        else if (headerValue === "role") columnMap.role = header.col;
+        else if (headerValue === "email") columnMap.email = header.col;
+        else if (headerValue === "phone") columnMap.phone = header.col;
+        else if (headerValue === "_be_accountname" || headerValue === "account")
+          columnMap.company = header.col;
+        else if (headerValue === "department")
+          columnMap.department = header.col;
       });
 
       console.log("Mappage des colonnes:", columnMap);
 
       // Convertir la feuille en JSON en ignorant la première ligne d'en-têtes
       const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-        range: 1 // Commencer à la ligne 2 (ignorer les en-têtes)
+        range: 1, // Commencer à la ligne 2 (ignorer les en-têtes)
       });
 
       if (jsonData.length === 0) {
@@ -301,52 +375,66 @@ class ContactService {
       console.log(`${jsonData.length} lignes extraites`);
 
       // Normaliser les données en contacts
-      const contacts = jsonData.map(row => {
-        // Obtenir le nom complet
-        let fullName = "";
-        if (columnMap.fullName && row[headers.find(h => h.col === columnMap.fullName)?.value]) {
-          fullName = row[headers.find(h => h.col === columnMap.fullName)?.value];
-        } else if (columnMap.firstName && columnMap.lastName) {
-          const firstName = row[headers.find(h => h.col === columnMap.firstName)?.value] || "";
-          const lastName = row[headers.find(h => h.col === columnMap.lastName)?.value] || "";
-          fullName = `${firstName} ${lastName}`.trim();
-        }
+      const contacts = jsonData
+        .map((row) => {
+          // Obtenir le nom complet
+          let fullName = "";
+          if (
+            columnMap.fullName &&
+            row[headers.find((h) => h.col === columnMap.fullName)?.value]
+          ) {
+            fullName =
+              row[headers.find((h) => h.col === columnMap.fullName)?.value];
+          } else if (columnMap.firstName && columnMap.lastName) {
+            const firstName =
+              row[headers.find((h) => h.col === columnMap.firstName)?.value] ||
+              "";
+            const lastName =
+              row[headers.find((h) => h.col === columnMap.lastName)?.value] ||
+              "";
+            fullName = `${firstName} ${lastName}`.trim();
+          }
 
-        // Ignore les lignes sans nom
-        if (!fullName) return null;
+          // Ignore les lignes sans nom
+          if (!fullName) return null;
 
-        // Obtenir le rôle et le normaliser
-        const role = columnMap.role 
-          ? row[headers.find(h => h.col === columnMap.role)?.value] || "Poste non spécifié"
-          : "Poste non spécifié";
-        
-        // Utiliser la fonction _normalizeTitle pour classifier le rôle
-        const normalizedRole = this._normalizeTitle(role);
+          // Obtenir le rôle et le normaliser
+          const role = columnMap.role
+            ? row[headers.find((h) => h.col === columnMap.role)?.value] ||
+              "Poste non spécifié"
+            : "Poste non spécifié";
 
-        // Obtenir l'email
-        const email = columnMap.email
-          ? row[headers.find(h => h.col === columnMap.email)?.value] || ""
-          : "";
+          // Utiliser la fonction _normalizeTitle pour classifier le rôle
+          const normalizedRole = this._normalizeTitle(role);
 
-        // Créer l'objet contact
-        return {
-          fullName,
-          role: normalizedRole,
-          email: email,
-          department: columnMap.department 
-            ? row[headers.find(h => h.col === columnMap.department)?.value] || "" 
-            : "",
-          phone: columnMap.phone 
-            ? row[headers.find(h => h.col === columnMap.phone)?.value] || "" 
-            : "",
-          company: columnMap.company 
-            ? row[headers.find(h => h.col === columnMap.company)?.value] || "Schneider Electric" 
-            : "Schneider Electric",
-          confidenceScore: 1.0, // Score élevé pour les contacts importés
-          importedFromExcel: true,
-          sources: [],
-        };
-      }).filter(contact => contact !== null);
+          // Obtenir l'email
+          const email = columnMap.email
+            ? row[headers.find((h) => h.col === columnMap.email)?.value] || ""
+            : "";
+
+          // Créer l'objet contact
+          return {
+            fullName,
+            role: normalizedRole,
+            email: email,
+            department: columnMap.department
+              ? row[
+                  headers.find((h) => h.col === columnMap.department)?.value
+                ] || ""
+              : "",
+            phone: columnMap.phone
+              ? row[headers.find((h) => h.col === columnMap.phone)?.value] || ""
+              : "",
+            company: columnMap.company
+              ? row[headers.find((h) => h.col === columnMap.company)?.value] ||
+                "Schneider Electric"
+              : "Schneider Electric",
+            confidenceScore: 1.0, // Score élevé pour les contacts importés
+            importedFromExcel: true,
+            sources: [],
+          };
+        })
+        .filter((contact) => contact !== null);
 
       console.log(`${contacts.length} contacts valides extraits`);
       console.log("Exemple des premiers contacts:", contacts.slice(0, 3));
@@ -365,134 +453,183 @@ class ContactService {
    */
   _normalizeTitle(title) {
     if (!title) return "Poste non spécifié";
-    
+
     const lowerTitle = title.toLowerCase();
-    
+
     // PDG / CEO
-    if (lowerTitle.includes("pdg") || lowerTitle.includes("ceo") || 
-        lowerTitle.includes("président") || lowerTitle.includes("president") || 
-        lowerTitle.includes("chief executive") || lowerTitle.includes("directeur général")) {
+    if (
+      lowerTitle.includes("pdg") ||
+      lowerTitle.includes("ceo") ||
+      lowerTitle.includes("président") ||
+      lowerTitle.includes("president") ||
+      lowerTitle.includes("chief executive") ||
+      lowerTitle.includes("directeur général")
+    ) {
       return "CEO / PDG";
     }
-    
+
     // CFO / Directeur Financier
-    if (lowerTitle.includes("cfo") || lowerTitle.includes("financier") || 
-        lowerTitle.includes("finance") || lowerTitle.includes("chief financial")) {
+    if (
+      lowerTitle.includes("cfo") ||
+      lowerTitle.includes("financier") ||
+      lowerTitle.includes("finance") ||
+      lowerTitle.includes("chief financial")
+    ) {
       return "CFO / Directeur Financier";
     }
-    
+
     // CIO / DSI
-    if (lowerTitle.includes("cio") || lowerTitle.includes("dsi") || 
-        lowerTitle.includes("systèmes d'information") || lowerTitle.includes("information technology") ||
-        lowerTitle.includes("informatique")) {
+    if (
+      lowerTitle.includes("cio") ||
+      lowerTitle.includes("dsi") ||
+      lowerTitle.includes("systèmes d'information") ||
+      lowerTitle.includes("information technology") ||
+      lowerTitle.includes("informatique")
+    ) {
       return "CIO / DSI";
     }
-    
+
     // CTO / Directeur Technique
-    if (lowerTitle.includes("cto") || lowerTitle.includes("technique") || 
-        lowerTitle.includes("technology") || lowerTitle.includes("technical")) {
+    if (
+      lowerTitle.includes("cto") ||
+      lowerTitle.includes("technique") ||
+      lowerTitle.includes("technology") ||
+      lowerTitle.includes("technical")
+    ) {
       return "CTO / Directeur Technique";
     }
-    
+
     // CDO / Directeur Digital
-    if (lowerTitle.includes("cdo") || lowerTitle.includes("digital") || 
-        lowerTitle.includes("numérique")) {
+    if (
+      lowerTitle.includes("cdo") ||
+      lowerTitle.includes("digital") ||
+      lowerTitle.includes("numérique")
+    ) {
       return "CDO / Directeur Digital";
     }
-    
+
     // COO / Directeur des Opérations
-    if (lowerTitle.includes("coo") || lowerTitle.includes("opérations") || 
-        lowerTitle.includes("operations")) {
+    if (
+      lowerTitle.includes("coo") ||
+      lowerTitle.includes("opérations") ||
+      lowerTitle.includes("operations")
+    ) {
       return "COO / Directeur des Opérations";
     }
-    
+
     // CMO / Directeur Marketing
     if (lowerTitle.includes("cmo") || lowerTitle.includes("marketing")) {
       return "CMO / Directeur Marketing";
     }
-    
+
     // CHRO / DRH
-    if (lowerTitle.includes("rh") || lowerTitle.includes("ressources humaines") || 
-        lowerTitle.includes("human resources") || lowerTitle.includes("chro") || 
-        lowerTitle.includes("drh")) {
+    if (
+      lowerTitle.includes("rh") ||
+      lowerTitle.includes("ressources humaines") ||
+      lowerTitle.includes("human resources") ||
+      lowerTitle.includes("chro") ||
+      lowerTitle.includes("drh")
+    ) {
       return "CHRO / DRH";
     }
-    
+
     // CSO / Directeur Sécurité
-    if (lowerTitle.includes("cso") || lowerTitle.includes("sécurité") || 
-        lowerTitle.includes("security")) {
+    if (
+      lowerTitle.includes("cso") ||
+      lowerTitle.includes("sécurité") ||
+      lowerTitle.includes("security")
+    ) {
       return "CSO / Directeur Sécurité";
     }
-    
+
     // Directeur Stratégie
     if (lowerTitle.includes("stratégie") || lowerTitle.includes("strategy")) {
       return "Directeur Stratégie";
     }
-    
+
     // Directeur Commercial
-    if ((lowerTitle.includes("commercial") || lowerTitle.includes("ventes") || 
-         lowerTitle.includes("sales")) && 
-        (lowerTitle.includes("directeur") || lowerTitle.includes("director"))) {
+    if (
+      (lowerTitle.includes("commercial") ||
+        lowerTitle.includes("ventes") ||
+        lowerTitle.includes("sales")) &&
+      (lowerTitle.includes("directeur") || lowerTitle.includes("director"))
+    ) {
       return "Directeur Commercial";
     }
-    
+
     // Directeur de la Transformation
     if (lowerTitle.includes("transformation")) {
       return "Directeur de la Transformation";
     }
-    
+
     // Directeur de l'Innovation
     if (lowerTitle.includes("innovation")) {
       return "Directeur de l'Innovation";
     }
-    
+
     // Directeur de la Supply Chain
-    if (lowerTitle.includes("supply chain") || lowerTitle.includes("chaîne") || 
-        lowerTitle.includes("logistique")) {
+    if (
+      lowerTitle.includes("supply chain") ||
+      lowerTitle.includes("chaîne") ||
+      lowerTitle.includes("logistique")
+    ) {
       return "Directeur de la Supply Chain";
     }
-    
+
     // Directeur de Production
-    if (lowerTitle.includes("production") || lowerTitle.includes("manufacturing")) {
+    if (
+      lowerTitle.includes("production") ||
+      lowerTitle.includes("manufacturing")
+    ) {
       return "Directeur de Production";
     }
-    
+
     // Directeur de Projet
     if (lowerTitle.includes("projet") || lowerTitle.includes("project")) {
       return "Directeur de Projet";
     }
-    
+
     // VP / Vice-Président
     if (lowerTitle.includes("vice") || lowerTitle.includes("vp")) {
       return "VP / Vice-Président";
     }
-    
+
     // Responsable IT
-    if ((lowerTitle.includes("it") || lowerTitle.includes("informatique")) && 
-        (lowerTitle.includes("responsable") || lowerTitle.includes("manager") || 
-         lowerTitle.includes("chef"))) {
+    if (
+      (lowerTitle.includes("it") || lowerTitle.includes("informatique")) &&
+      (lowerTitle.includes("responsable") ||
+        lowerTitle.includes("manager") ||
+        lowerTitle.includes("chef"))
+    ) {
       return "Responsable IT";
     }
-    
+
     // Responsable Commercial
-    if ((lowerTitle.includes("commercial") || lowerTitle.includes("ventes") || 
-         lowerTitle.includes("sales")) && 
-        (lowerTitle.includes("responsable") || lowerTitle.includes("manager") || 
-         lowerTitle.includes("chef"))) {
+    if (
+      (lowerTitle.includes("commercial") ||
+        lowerTitle.includes("ventes") ||
+        lowerTitle.includes("sales")) &&
+      (lowerTitle.includes("responsable") ||
+        lowerTitle.includes("manager") ||
+        lowerTitle.includes("chef"))
+    ) {
       return "Responsable Commercial";
     }
-    
+
     // Responsable Achats
-    if (lowerTitle.includes("achat") || lowerTitle.includes("procurement") || 
-        lowerTitle.includes("purchasing")) {
+    if (
+      lowerTitle.includes("achat") ||
+      lowerTitle.includes("procurement") ||
+      lowerTitle.includes("purchasing")
+    ) {
       return "Responsable Achats";
     }
-    
+
     // Chef de Produit
     if (lowerTitle.includes("produit") || lowerTitle.includes("product")) {
       return "Chef de Produit";
     }
-    
+
     // Si aucune correspondance précise, retourner "Autre"
     return "Autre";
   }
