@@ -300,8 +300,8 @@ const ContactTabContent = ({
         <div className="premium-loading-overlay">
           <LoadingSpinner size="large" />
           <p>
-            {importLoading
-              ? "Importation des contacts en cours..."
+            {importLoading 
+              ? "Importation des contacts en cours..." 
               : "Extraction et analyse des contacts en cours..."}
           </p>
         </div>
