@@ -607,8 +607,9 @@ function analyzeNewsRelevance(news, offers) {
     // Pour chaque actualité
     news.forEach((newsItem) => {
       // Texte de l'actualité en minuscules pour la recherche
-      const newsText =
-        `${newsItem.title} ${newsItem.description} ${newsItem.category}`.toLowerCase();
+      const newsText = `${newsItem.title} ${newsItem.description || ""} ${
+        newsItem.category || ""
+      }`.toLowerCase();
 
       // Pour chaque catégorie d'offre
       Object.entries(KEYWORDS_BY_CATEGORY).forEach(([category, keywords]) => {
@@ -625,13 +626,39 @@ function analyzeNewsRelevance(news, offers) {
 
         // Calculer un score de pertinence de 1 à 3
         let relevanceScore = 0;
-        if (matchCount > 3) {
+        if (matchCount > 5) {
+          // Augmenter le seuil pour un score élevé
           relevanceScore = 3; // Très pertinent
-        } else if (matchCount > 1) {
+        } else if (matchCount > 2) {
+          // Ajuster le seuil intermédiaire
           relevanceScore = 2; // Pertinent
         } else if (matchCount > 0) {
           relevanceScore = 1; // Légèrement pertinent
         }
+
+        // Facteur d'ajustement basé sur la spécificité des mots clés
+        // Les mots-clés plus spécifiques ont plus de poids
+        let specificityFactor = 0;
+        matchedKeywords.forEach((keyword) => {
+          // Les termes plus longs sont généralement plus spécifiques
+          if (keyword.length > 8) specificityFactor += 0.1;
+
+          // Les termes techniques ont plus de poids
+          const technicalTerms = [
+            "erp",
+            "crm",
+            "analytics",
+            "cloud",
+            "cybersécurité",
+            "ia",
+            "ai",
+          ];
+          if (technicalTerms.includes(keyword.toLowerCase()))
+            specificityFactor += 0.2;
+        });
+
+        // Ajuster le score en fonction de la spécificité (mais pas au-delà de 3)
+        relevanceScore = Math.min(3, relevanceScore * (1 + specificityFactor));
 
         // Si au moins un mot clé a été trouvé, ajouter à la matrice
         if (relevanceScore > 0) {
@@ -662,7 +689,7 @@ function analyzeNewsRelevance(news, offers) {
             newsDescription: newsItem.description,
             newsLink: newsItem.link,
             offerCategory: category,
-            relevanceScore: relevanceScore,
+            relevanceScore: Math.round(relevanceScore), // Arrondir pour maintenir des valeurs entières 1, 2 ou 3
             offerDetail: matchedOffers.join(", ") || category,
           });
         }
@@ -678,9 +705,3 @@ function analyzeNewsRelevance(news, offers) {
     return [];
   }
 }
-
-// Exporter les fonctions du service
-export const rssFeedService = {
-  getAllNews,
-  analyzeNewsRelevance,
-};
