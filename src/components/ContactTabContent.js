@@ -6,6 +6,7 @@ import SelectedContactsTab from "./SelectedContactsTab";
 import LoadingSpinner from "./LoadingSpinner";
 
 // Stockage local pour les contacts importés (persistance entre les changements d'onglets)
+// Initialisation avec un tableau vide pour éviter undefined
 let storedImportedContacts = [];
 
 const ContactTabContent = ({
@@ -16,7 +17,7 @@ const ContactTabContent = ({
 }) => {
   // États de gestion des contacts
   const [contacts, setContacts] = useState([]);
-  const [excelContacts, setExcelContacts] = useState(storedImportedContacts); // Utiliser la valeur stockée
+  const [excelContacts, setExcelContacts] = useState(storedImportedContacts || []); // Ajout de || [] pour éviter undefined
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("extracted");
@@ -36,11 +37,11 @@ const ContactTabContent = ({
   // S'abonner aux changements d'opportunités sélectionnées
   useEffect(() => {
     // Obtenir les opportunités déjà sélectionnées
-    setSelectedOpportunities(prospectionService.getSelectedOpportunities());
+    setSelectedOpportunities(prospectionService.getSelectedOpportunities() || []);
 
     // S'abonner aux futurs changements
     const unsubscribe = prospectionService.subscribe((opportunities) => {
-      setSelectedOpportunities(opportunities);
+      setSelectedOpportunities(opportunities || []);
     });
 
     // Se désabonner lors du démontage du composant
@@ -53,13 +54,13 @@ const ContactTabContent = ({
       setLoading(true);
       // Extraire les contacts des actualités Schneider Electric
       const newsItems = [
-        ...(data.schneiderNews || []),
-        ...(combinedRelevanceMatrix || []).map((item) => ({
+        ...(data?.schneiderNews || []),
+        ...((combinedRelevanceMatrix || []).map((item) => ({
           title: item.news,
           description: item.newsDescription || "",
           date: item.newsDate,
           link: item.newsLink || "",
-        })),
+        })))
       ];
 
       const extractedContacts =
@@ -68,16 +69,16 @@ const ContactTabContent = ({
       // Identifier les rôles manquants
       const roles = contactService.identifyRolesInNews(combinedRelevanceMatrix || []);
       const rolesToContacts = contactService.matchContactsToRoles(
-        extractedContacts,
-        roles
+        extractedContacts || [],
+        roles || []
       );
       const missingRolesList = contactService.identifyMissingRoles(
-        roles,
-        rolesToContacts
+        roles || [],
+        rolesToContacts || {}
       );
 
-      setContacts(extractedContacts);
-      setMissingRoles(missingRolesList);
+      setContacts(extractedContacts || []);
+      setMissingRoles(missingRolesList || []);
     } catch (error) {
       console.error("Erreur lors de l'extraction des contacts:", error);
     } finally {
@@ -109,39 +110,39 @@ const ContactTabContent = ({
 
         // Analyser la pertinence des contacts importés
         const relevanceAnalysis = contactService.analyzeContactRelevance(
-          importedContacts,
+          importedContacts || [],
           combinedRelevanceMatrix || []
         );
 
         // Stocker les contacts importés à la fois dans l'état local et dans la variable globale
-        setExcelContacts(relevanceAnalysis);
-        storedImportedContacts = relevanceAnalysis; // Stockage pour la persistance
+        setExcelContacts(relevanceAnalysis || []);
+        storedImportedContacts = relevanceAnalysis || []; // Stockage pour la persistance
 
         // Identifier les rôles manquants
         const roles = contactService.identifyRolesInNews(
           combinedRelevanceMatrix || []
         );
         const rolesToContacts = contactService.matchContactsToRoles(
-          relevanceAnalysis,
-          roles
+          relevanceAnalysis || [],
+          roles || []
         );
         const missingRolesList = contactService.identifyMissingRoles(
-          roles,
-          rolesToContacts
+          roles || [],
+          rolesToContacts || {}
         );
 
-        setMissingRoles(missingRolesList);
+        setMissingRoles(missingRolesList || []);
         setMissingRoleContacts(
-          relevanceAnalysis.filter((contact) =>
-            missingRolesList.some((role) =>
-              contact.role.toLowerCase().includes(role.toLowerCase())
+          (relevanceAnalysis || []).filter((contact) =>
+            (missingRolesList || []).some((role) =>
+              (contact.role || "").toLowerCase().includes((role || "").toLowerCase())
             )
           )
         );
 
         // Afficher un message de succès
         alert(
-          `${importedContacts.length} contacts ont été importés avec succès!`
+          `${(importedContacts || []).length} contacts ont été importés avec succès!`
         );
 
         // Passer automatiquement à l'onglet "importés"
@@ -163,7 +164,7 @@ const ContactTabContent = ({
   // Gestion de la sélection de fichier
   const handleFileSelect = useCallback(
     (event) => {
-      const file = event.target.files[0];
+      const file = event.target.files && event.target.files[0];
       if (file) {
         // Passer l'objet File directement
         importExcelContacts(file);
@@ -179,7 +180,7 @@ const ContactTabContent = ({
     // Identifier les opportunités potentielles de prospection
     const potentialOpportunities = prospectionService.identifyNewOpportunities(
       combinedRelevanceMatrix || [],
-      opportunitiesByOffering
+      opportunitiesByOffering || {}
     );
 
     console.log(
@@ -189,7 +190,7 @@ const ContactTabContent = ({
   }, [extractContacts, combinedRelevanceMatrix, opportunitiesByOffering]);
 
   // Obtenir tous les contacts (extraits + importés)
-  const allContacts = [...contacts, ...excelContacts];
+  const allContacts = [...(contacts || []), ...(excelContacts || [])];
 
   return (
     <div className="contacts-content">
@@ -201,7 +202,7 @@ const ContactTabContent = ({
           {/* Bouton d'import des contacts */}
           <button
             className="import-button"
-            onClick={() => fileInputRef.current.click()}
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
             disabled={importLoading}
           >
             {importLoading ? (
@@ -254,7 +255,7 @@ const ContactTabContent = ({
           onClick={() => setActiveTab("imported")}
         >
           Contacts importés
-          {excelContacts.length > 0 && (
+          {excelContacts && excelContacts.length > 0 && (
             <span className="tab-badge">{excelContacts.length}</span>
           )}
         </button>
@@ -265,13 +266,13 @@ const ContactTabContent = ({
           onClick={() => setActiveTab("selected")}
         >
           Contacts recommandés
-          {selectedOpportunities.length > 0 && (
+          {selectedOpportunities && selectedOpportunities.length > 0 && (
             <span className="tab-badge highlight-badge">
               {selectedOpportunities.length}
             </span>
           )}
         </button>
-        {missingRoles.length > 0 && (
+        {missingRoles && missingRoles.length > 0 && (
           <button
             className={`contacts-tab-button ${
               activeTab === "missing" ? "active" : ""
@@ -304,7 +305,7 @@ const ContactTabContent = ({
           <div className="contacts-main-content">
             {activeTab === "extracted" && (
               <ContactList
-                contacts={contacts}
+                contacts={contacts || []}
                 isLoadingRss={isLoadingRss}
                 onContactSelect={handleContactSelect}
               />
@@ -312,7 +313,7 @@ const ContactTabContent = ({
 
             {activeTab === "imported" && (
               <ContactList
-                contacts={excelContacts}
+                contacts={excelContacts || []}
                 isLoadingRss={isLoadingRss}
                 isImportedList={true}
                 onContactSelect={handleContactSelect}
@@ -322,12 +323,12 @@ const ContactTabContent = ({
             {activeTab === "selected" && (
               <SelectedContactsTab
                 contacts={allContacts}
-                selectedOpportunities={selectedOpportunities}
+                selectedOpportunities={selectedOpportunities || []}
                 isLoading={loading || isLoadingRss || importLoading}
               />
             )}
 
-            {activeTab === "missing" && missingRoles.length > 0 && (
+            {activeTab === "missing" && missingRoles && missingRoles.length > 0 && (
               <div className="missing-roles-container">
                 <div className="missing-roles-info">
                   <p>
@@ -343,10 +344,10 @@ const ContactTabContent = ({
                         <h3>{role}</h3>
                         <div className="potential-matches-badge">
                           {
-                            missingRoleContacts.filter((contact) =>
-                              contact.role
+                            (missingRoleContacts || []).filter((contact) =>
+                              (contact.role || "")
                                 .toLowerCase()
-                                .includes(role.toLowerCase())
+                                .includes((role || "").toLowerCase())
                             ).length
                           }{" "}
                           correspondances potentielles
@@ -354,11 +355,11 @@ const ContactTabContent = ({
                       </div>
 
                       <div className="potential-contacts">
-                        {missingRoleContacts
+                        {(missingRoleContacts || [])
                           .filter((contact) =>
-                            contact.role
+                            (contact.role || "")
                               .toLowerCase()
-                              .includes(role.toLowerCase())
+                              .includes((role || "").toLowerCase())
                           )
                           .map((contact, idx) => (
                             <div key={idx} className="potential-contact-card">
@@ -429,9 +430,9 @@ const ContactTabContent = ({
 
             <div className="contact-details-content">
               <div className="contact-details-avatar">
-                {(selectedContact.fullName || selectedContact.name || "")
+                {((selectedContact.fullName || selectedContact.name || "")
                   .charAt(0)
-                  .toUpperCase()}
+                  .toUpperCase())}
               </div>
 
               <h2 className="contact-details-name">
