@@ -911,7 +911,7 @@ const ContactList = ({
         }
 
         .role-main {
-          font-weight: 500;
+          font-weight: 600;
           color: var(--text-primary);
         }
 
@@ -919,6 +919,7 @@ const ContactList = ({
           font-size: 12px;
           color: var(--text-tertiary);
           margin-top: 2px;
+          font-style: italic;
         }
 
         .email-column {
