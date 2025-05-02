@@ -463,7 +463,7 @@ const ContactTabContent = ({
               {selectedContact.email && (
                 <div className="contact-details-info">
                   <label>Email</label>
-                  
+                  <a
                     href={`mailto:${selectedContact.email}`}
                     className="contact-details-email"
                   >
@@ -475,7 +475,7 @@ const ContactTabContent = ({
               {selectedContact.phone && (
                 <div className="contact-details-info">
                   <label>Téléphone</label>
-                  
+                  <a
                     href={`tel:${selectedContact.phone}`}
                     className="contact-details-phone"
                   >
@@ -493,7 +493,7 @@ const ContactTabContent = ({
                       {selectedContact.sources.map((source, idx) => (
                         <li key={idx} className="contact-source-item">
                           {source.link ? (
-                            
+                            <a
                               href={source.link}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -549,7 +549,7 @@ const ContactTabContent = ({
 
               {/* Actions */}
               <div className="contact-details-actions">
-                
+                <a
                   href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
                     selectedContact.fullName || selectedContact.name
                   )}`}
@@ -595,7 +595,7 @@ const ContactTabContent = ({
                 </a>
 
                 {selectedContact.email && (
-                  
+                  <a
                     href={`mailto:${selectedContact.email}`}
                     className="email-button"
                   >
