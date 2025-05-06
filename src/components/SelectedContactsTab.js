@@ -1,3 +1,380 @@
+import React, { useState, useEffect } from "react";
+import { prospectionService } from "../services/prospectionService";
+import LoadingSpinner from "./LoadingSpinner";
+
+/**
+ * Composant qui affiche un état vide pour une opportunité
+ * @param {Object} props - Props du composant
+ * @param {Object} props.opportunity - L'opportunité sans contacts
+ * @param {string} props.message - Message à afficher
+ * @param {JSX.Element|null} props.actionButton - Bouton d'action optionnel
+ * @returns {JSX.Element} État vide stylisé
+ */
+const EmptyStateCard = ({ opportunity, message, actionButton }) => (
+  <div
+    style={{
+      backgroundColor: "var(--glass-bg)",
+      backdropFilter: "blur(15px)",
+      WebkitBackdropFilter: "blur(15px)",
+      borderRadius: "var(--border-radius-lg)",
+      border: "1px solid var(--glass-border)",
+      padding: "24px",
+      textAlign: "center",
+      marginBottom: "24px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "16px",
+    }}
+  >
+    <div
+      style={{
+        padding: "12px",
+        backgroundColor: "rgba(99, 102, 241, 0.05)",
+        borderRadius: "var(--border-radius)",
+        marginBottom: "8px",
+        fontSize: "16px",
+        fontWeight: "600",
+        color: "var(--text-primary)",
+        width: "100%",
+        maxWidth: "600px",
+      }}
+    >
+      {opportunity.detail}
+      <div
+        style={{
+          fontSize: "13px",
+          fontWeight: "normal",
+          color: "var(--text-secondary)",
+          marginTop: "4px",
+        }}
+      >
+        {opportunity.category}
+      </div>
+    </div>
+
+    <div
+      style={{
+        width: "64px",
+        height: "64px",
+        borderRadius: "50%",
+        backgroundColor: "rgba(0, 0, 0, 0.03)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: "16px",
+      }}
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--text-tertiary)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+    </div>
+
+    <div
+      style={{
+        fontSize: "15px",
+        fontWeight: "400",
+        color: "var(--text-secondary)",
+        maxWidth: "400px",
+        lineHeight: "1.6",
+      }}
+    >
+      {message === "Pas de synchronisation"
+        ? 'Cliquez sur "Me recommander des contacts" pour analyser les contacts pertinents pour cette opportunité.'
+        : "Aucun contact ne correspond précisément à cette opportunité."}
+    </div>
+
+    {actionButton}
+  </div>
+);
+
+/**
+ * Composant pour afficher un tableau de contacts
+ * @param {Object} props - Props du composant
+ * @param {Array} props.contacts - Liste des contacts
+ * @param {Object} props.opportunity - L'opportunité associée
+ * @param {Function} props.onExport - Fonction pour exporter les contacts
+ * @returns {JSX.Element} Tableau de contacts
+ */
+const ContactsTable = ({ contacts, opportunity, onExport }) => {
+  // État pour la sélection des contacts
+  const [selectedContacts, setSelectedContacts] = useState([]);
+
+  // Toggle pour sélectionner/désélectionner tous les contacts
+  const toggleSelectAll = () => {
+    if (selectedContacts.length === contacts.length) {
+      setSelectedContacts([]);
+    } else {
+      setSelectedContacts(
+        contacts.map((contact) => contact.name || contact.fullName)
+      );
+    }
+  };
+
+  // Toggle pour sélectionner/désélectionner un contact
+  const toggleContactSelection = (contactName) => {
+    const name = contactName.name || contactName.fullName || contactName;
+    if (selectedContacts.includes(name)) {
+      setSelectedContacts(
+        selectedContacts.filter((selectedName) => selectedName !== name)
+      );
+    } else {
+      setSelectedContacts([...selectedContacts, name]);
+    }
+  };
+
+  // Gérer l'exportation des contacts sélectionnés
+  const handleExport = () => {
+    const contactsToExport = contacts.filter((contact) =>
+      selectedContacts.includes(contact.name || contact.fullName)
+    );
+
+    if (contactsToExport.length === 0) {
+      alert("Veuillez sélectionner au moins un contact à exporter.");
+      return;
+    }
+
+    onExport(contactsToExport, opportunity);
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: "white",
+        borderRadius: "0 0 var(--border-radius-lg) var(--border-radius-lg)",
+        border: "1px solid var(--divider)",
+        borderTop: "none",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "12px 20px",
+          borderBottom: "1px solid var(--divider)",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={
+              selectedContacts.length === contacts.length && contacts.length > 0
+            }
+            onChange={toggleSelectAll}
+            id="select-all"
+            className="premium-checkbox"
+          />
+          <label
+            htmlFor="select-all"
+            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+          >
+            Tout sélectionner ({selectedContacts.length}/{contacts.length})
+          </label>
+        </div>
+
+        <button
+          onClick={handleExport}
+          disabled={selectedContacts.length === 0}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 16px",
+            borderRadius: "var(--border-radius)",
+            fontSize: "14px",
+            fontWeight: "500",
+            backgroundColor:
+              selectedContacts.length === 0
+                ? "rgba(0, 0, 0, 0.05)"
+                : "rgba(0, 113, 243, 0.1)",
+            color:
+              selectedContacts.length === 0
+                ? "var(--text-tertiary)"
+                : "var(--primary)",
+            border: "1px solid",
+            borderColor:
+              selectedContacts.length === 0
+                ? "rgba(0, 0, 0, 0.1)"
+                : "rgba(0, 113, 243, 0.2)",
+            cursor: selectedContacts.length === 0 ? "not-allowed" : "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Exporter les contacts sélectionnés
+        </button>
+      </div>
+
+      <div style={{ maxHeight: "600px", overflowY: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "14px",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "rgba(0, 0, 0, 0.02)" }}>
+              <th
+                style={{ padding: "12px", textAlign: "center", width: "40px" }}
+              ></th>
+              <th style={{ padding: "12px", textAlign: "left" }}>Nom</th>
+              <th style={{ padding: "12px", textAlign: "left" }}>Rôle</th>
+              <th style={{ padding: "12px", textAlign: "left" }}>Contact</th>
+              <th
+                style={{ padding: "12px", textAlign: "right", width: "80px" }}
+              >
+                Pertinence
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {contacts.map((contact, index) => (
+              <tr
+                key={index}
+                style={{
+                  borderBottom: "1px solid var(--divider)",
+                  backgroundColor: selectedContacts.includes(
+                    contact.name || contact.fullName
+                  )
+                    ? "rgba(0, 113, 243, 0.05)"
+                    : "transparent",
+                  transition: "background-color 0.2s ease",
+                }}
+              >
+                <td style={{ padding: "12px", textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedContacts.includes(
+                      contact.name || contact.fullName
+                    )}
+                    onChange={() => toggleContactSelection(contact)}
+                    id={`contact-${index}`}
+                    className="premium-checkbox"
+                  />
+                </td>
+                <td style={{ padding: "12px" }}>
+                  <div style={{ fontWeight: "500" }}>
+                    {contact.fullName || contact.name}
+                  </div>
+                  {contact.department && (
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-tertiary)",
+                      }}
+                    >
+                      {contact.department}
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: "12px" }}>
+                  <div>{contact.role || "Non spécifié"}</div>
+                </td>
+                <td style={{ padding: "12px" }}>
+                  {contact.email ? (
+                    <a
+                      href={`mailto:${contact.email}`}
+                      style={{
+                        color: "var(--primary)",
+                        textDecoration: "none",
+                        display: "block",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {contact.email}
+                    </a>
+                  ) : (
+                    <span
+                      style={{
+                        color: "var(--text-tertiary)",
+                        fontStyle: "italic",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Email non disponible
+                    </span>
+                  )}
+                  {contact.phone && (
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        marginTop: "4px",
+                      }}
+                    >
+                      {contact.phone}
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: "12px", textAlign: "right" }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "4px 8px",
+                      borderRadius: "var(--border-radius-full)",
+                      backgroundColor:
+                        contact.relevanceScore > 0.8
+                          ? "rgba(5, 150, 105, 0.1)"
+                          : contact.relevanceScore > 0.6
+                          ? "rgba(0, 113, 243, 0.1)"
+                          : "rgba(107, 114, 128, 0.1)",
+                      color:
+                        contact.relevanceScore > 0.8
+                          ? "var(--success)"
+                          : contact.relevanceScore > 0.6
+                          ? "var(--primary)"
+                          : "var(--text-secondary)",
+                      fontSize: "12px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {Math.round(contact.relevanceScore * 100)}%
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 /**
  * Composant principal pour l'onglet des contacts recommandés
  */
@@ -450,10 +827,6 @@ const SelectedContactsTab = ({
           onMouseOut={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(245, 158, 11, 0.1)";
             e.currentTarget.style.transform = "translateY(0)";
-          }}
-          onClick={() => {
-            // Vous pouvez ajouter ici une fonction pour naviguer vers l'onglet des contacts
-            // Par exemple: setActiveTab('imported');
           }}
         >
           <svg
