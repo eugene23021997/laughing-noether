@@ -178,184 +178,217 @@ class ProspectionService {
     // Normaliser le score
     return Math.min(1, Math.max(0, totalScore));
   }
-/**
- * Calcule la pertinence avancée d'un contact par rapport à une opportunité spécifique
- * @param {Object} contact - Le contact à évaluer
- * @param {Object} opportunity - L'opportunité spécifique (pas un tableau)
- * @returns {number} Score de pertinence entre 0 et 1
- */
-calculateContactRelevanceForOpportunity(contact, opportunity) {
-  let totalScore = 0;
 
-  // Vérifications de base
-  if (!contact || !contact.role || !opportunity) return 0;
+  /**
+   * Calcule la pertinence avancée d'un contact par rapport à une opportunité spécifique
+   * @param {Object} contact - Le contact à évaluer
+   * @param {Object} opportunity - L'opportunité spécifique (pas un tableau)
+   * @returns {number} Score de pertinence entre 0 et 1
+   */
+  calculateContactRelevanceForOpportunity(contact, opportunity) {
+    let totalScore = 0;
 
-  // Conversion des données en minuscules pour comparaison
-  const roleLower = (contact.role || "").toLowerCase();
-  const departmentLower = (contact.department || "").toLowerCase();
-  const emailLower = (contact.email || "").toLowerCase();
-  
-  // Données de l'opportunité en minuscules
-  const opportunityCategory = (opportunity.category || "").toLowerCase();
-  const opportunityDetail = (opportunity.detail || "").toLowerCase();
-  const opportunityNews = (opportunity.news || "").toLowerCase();
-  const opportunityDescription = (opportunity.newsDescription || "").toLowerCase();
-  
-  // Combinaison des textes d'opportunité pour une analyse globale
-  const opportunityText = `${opportunityCategory} ${opportunityDetail} ${opportunityNews} ${opportunityDescription}`;
+    // Vérifications de base
+    if (!contact || !contact.role || !opportunity) return 0;
 
-  // 1. Analyse du rôle décisionnel
-  const isDecisionMaker = CONTACT_SELECTION_CRITERIA.decisionMakerRoles.some(
-    (role) => roleLower.includes(role.toLowerCase())
-  );
-  totalScore += isDecisionMaker ? 0.3 : 0.1;
+    // Conversion des données en minuscules pour comparaison
+    const roleLower = (contact.role || "").toLowerCase();
+    const departmentLower = (contact.department || "").toLowerCase();
+    const emailLower = (contact.email || "").toLowerCase();
+    
+    // Données de l'opportunité en minuscules
+    const opportunityCategory = (opportunity.category || "").toLowerCase();
+    const opportunityDetail = (opportunity.detail || "").toLowerCase();
+    const opportunityNews = (opportunity.news || "").toLowerCase();
+    const opportunityDescription = (opportunity.newsDescription || "").toLowerCase();
+    
+    // Combinaison des textes d'opportunité pour une analyse globale
+    const opportunityText = `${opportunityCategory} ${opportunityDetail} ${opportunityNews} ${opportunityDescription}`;
 
-  // 2. Analyse de la correspondance directe avec l'opportunité
-  // Diviser la description de l'offre en mots-clés
-  const opportunityKeywords = opportunityDetail
-    .split(/\s+|,|;|-|\./)
-    .filter(word => word.length > 3)
-    .map(word => word.toLowerCase());
-  
-  // Vérifier si le rôle ou le département contient ces mots-clés
-  let keywordMatches = 0;
-  opportunityKeywords.forEach(keyword => {
-    if (roleLower.includes(keyword) || departmentLower.includes(keyword)) {
-      keywordMatches++;
-    }
-  });
-  
-  // Ajouter un score basé sur la correspondance de mots-clés
-  const keywordMatchScore = Math.min(0.5, keywordMatches * 0.1);
-  totalScore += keywordMatchScore;
-  
-  // 3. Analyse de la correspondance avec l'actualité
-  const newsKeywords = opportunityNews
-    .split(/\s+|,|;|-|\./)
-    .filter(word => word.length > 3)
-    .map(word => word.toLowerCase());
-  
-  let newsMatches = 0;
-  newsKeywords.forEach(keyword => {
-    if (roleLower.includes(keyword) || departmentLower.includes(keyword)) {
-      newsMatches++;
-    }
-  });
-  
-  const newsMatchScore = Math.min(0.3, newsMatches * 0.05);
-  totalScore += newsMatchScore;
-
-  // 4. Bonus pour l'expertise spécifique à la catégorie
-  // Définir les domaines d'expertise par catégorie
-  const expertiseByCategory = {
-    "Finance & Risk": ["finance", "risk", "comptable", "fiscal", "audit", "conformité"],
-    "Technology": ["it", "digital", "data", "cyber", "cloud", "architecture"],
-    "Operations": ["production", "supply", "logistique", "maintenance", "qualité"],
-    "People & Strategy": ["rh", "stratégie", "change", "talent", "transformation"],
-    "Customer & Growth": ["marketing", "commercial", "vente", "client", "crm"],
-    "BE Capital": ["m&a", "acquisition", "fusion", "investissement"]
-  };
-  
-  const categoryExpertise = expertiseByCategory[opportunity.category] || [];
-  let expertiseMatches = 0;
-  
-  categoryExpertise.forEach(expertise => {
-    if (roleLower.includes(expertise) || departmentLower.includes(expertise)) {
-      expertiseMatches++;
-    }
-  });
-  
-  const expertiseScore = Math.min(0.4, expertiseMatches * 0.1);
-  totalScore += expertiseScore;
-
-  // 5. Bonus pour les sources pertinentes
-  if (contact.sources && contact.sources.length > 0) {
-    // Vérifier si une des sources du contact est liée à l'actualité de l'opportunité
-    const hasRelevantSource = contact.sources.some(source => 
-      source.title && opportunity.news && 
-      (source.title.toLowerCase().includes(opportunity.news.toLowerCase()) || 
-       opportunity.news.toLowerCase().includes(source.title.toLowerCase()))
+    // 1. Analyse du rôle décisionnel
+    const isDecisionMaker = CONTACT_SELECTION_CRITERIA.decisionMakerRoles.some(
+      (role) => roleLower.includes(role.toLowerCase())
     );
+    totalScore += isDecisionMaker ? 0.3 : 0.1;
+
+    // 2. Analyse de la correspondance directe avec l'opportunité
+    // Diviser la description de l'offre en mots-clés
+    const opportunityKeywords = opportunityDetail
+      .split(/\s+|,|;|-|\./)
+      .filter(word => word.length > 3)
+      .map(word => word.toLowerCase());
     
-    if (hasRelevantSource) {
-      totalScore += 0.2;
+    // Vérifier si le rôle ou le département contient ces mots-clés
+    let keywordMatches = 0;
+    opportunityKeywords.forEach(keyword => {
+      if (roleLower.includes(keyword) || departmentLower.includes(keyword)) {
+        keywordMatches++;
+      }
+    });
+    
+    // Ajouter un score basé sur la correspondance de mots-clés
+    const keywordMatchScore = Math.min(0.5, keywordMatches * 0.1);
+    totalScore += keywordMatchScore;
+    
+    // 3. Analyse de la correspondance avec l'actualité
+    const newsKeywords = opportunityNews
+      .split(/\s+|,|;|-|\./)
+      .filter(word => word.length > 3)
+      .map(word => word.toLowerCase());
+    
+    let newsMatches = 0;
+    newsKeywords.forEach(keyword => {
+      if (roleLower.includes(keyword) || departmentLower.includes(keyword)) {
+        newsMatches++;
+      }
+    });
+    
+    const newsMatchScore = Math.min(0.3, newsMatches * 0.05);
+    totalScore += newsMatchScore;
+
+    // 4. Bonus pour l'expertise spécifique à la catégorie
+    // Définir les domaines d'expertise par catégorie
+    const expertiseByCategory = {
+      "Finance & Risk": ["finance", "risk", "comptable", "fiscal", "audit", "conformité"],
+      "Technology": ["it", "digital", "data", "cyber", "cloud", "architecture"],
+      "Operations": ["production", "supply", "logistique", "maintenance", "qualité"],
+      "People & Strategy": ["rh", "stratégie", "change", "talent", "transformation"],
+      "Customer & Growth": ["marketing", "commercial", "vente", "client", "crm"],
+      "BE Capital": ["m&a", "acquisition", "fusion", "investissement"]
+    };
+    
+    const categoryExpertise = expertiseByCategory[opportunity.category] || [];
+    let expertiseMatches = 0;
+    
+    categoryExpertise.forEach(expertise => {
+      if (roleLower.includes(expertise) || departmentLower.includes(expertise)) {
+        expertiseMatches++;
+      }
+    });
+    
+    const expertiseScore = Math.min(0.4, expertiseMatches * 0.1);
+    totalScore += expertiseScore;
+
+    // 5. Bonus pour les sources pertinentes
+    if (contact.sources && contact.sources.length > 0) {
+      // Vérifier si une des sources du contact est liée à l'actualité de l'opportunité
+      const hasRelevantSource = contact.sources.some(source => 
+        source.title && opportunity.news && 
+        (source.title.toLowerCase().includes(opportunity.news.toLowerCase()) || 
+         opportunity.news.toLowerCase().includes(source.title.toLowerCase()))
+      );
+      
+      if (hasRelevantSource) {
+        totalScore += 0.2;
+      }
+    }
+
+    // 6. Bonus pour le score de pertinence de l'opportunité
+    if (opportunity.relevanceScore === 3) {
+      totalScore += 0.1;
+    }
+
+    // 7. Bonus pour email professionnel valide
+    const isValidEmail = CONTACT_SELECTION_CRITERIA.companyDomains.some(
+      (domain) => emailLower.includes(domain)
+    );
+    if (isValidEmail) {
+      totalScore += 0.1;
+    }
+
+    // Normaliser le score final entre 0 et 1
+    return Math.min(1, totalScore);
+  }
+
+  /**
+   * Sélectionne une opportunité de prospection
+   * @param {Object} opportunity - L'opportunité à sélectionner
+   * @param {boolean} emitEvent - Si un événement doit être émis (défaut: true)
+   */
+  selectOpportunity(opportunity, emitEvent = true) {
+    // Vérifier si l'opportunité existe déjà
+    const exists = this.selectedOpportunities.some(
+      (op) =>
+        op.category === opportunity.category &&
+        op.detail === opportunity.detail
+    );
+
+    // Si non, l'ajouter à la liste
+    if (!exists) {
+      this.selectedOpportunities.push(opportunity);
+      
+      // Notifier les abonnés du changement
+      this._notifySubscribers();
+
+      // Émettre un événement pour notifier les autres composants
+      if (emitEvent) {
+        window.dispatchEvent(
+          new CustomEvent(OPPORTUNITY_SELECTED_EVENT, {
+            detail: { opportunity },
+          })
+        );
+      }
     }
   }
 
-  // 6. Bonus pour le score de pertinence de l'opportunité
-  if (opportunity.relevanceScore === 3) {
-    totalScore += 0.1;
+  /**
+   * Identifie les contacts recommandés pour une opportunité spécifique
+   * @param {Array} contacts - Liste des contacts disponibles
+   * @param {Object} opportunity - L'opportunité sélectionnée (un seul objet)
+   * @returns {Array} Contacts recommandés pour cette opportunité
+   */
+  identifyRecommendedContactsForOpportunity(contacts, opportunity) {
+    if (!contacts || !opportunity) return [];
+
+    // Calculer et filtrer les contacts pour cette opportunité spécifique
+    const recommendedContacts = contacts
+      .map((contact) => ({
+        ...contact,
+        relevanceScore: this.calculateContactRelevanceForOpportunity(contact, opportunity),
+      }))
+      // Filtrer les contacts vraiment pertinents pour cette opportunité (seuil plus élevé)
+      .filter(
+        (contact) =>
+          contact.relevanceScore > 0.4 && // Seuil adapté pour la pertinence par opportunité
+          (contact.email || contact.phone) &&
+          contact.role !== "Poste non spécifié"
+      )
+      // Trier par score de pertinence décroissant
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      // Limiter à 10 contacts maximum par opportunité
+      .slice(0, 10);
+
+    return recommendedContacts;
   }
 
-  // 7. Bonus pour email professionnel valide
-  const isValidEmail = CONTACT_SELECTION_CRITERIA.companyDomains.some(
-    (domain) => emailLower.includes(domain)
-  );
-  if (isValidEmail) {
-    totalScore += 0.1;
+  /**
+   * Identifie les contacts recommandés pour une liste d'opportunités
+   * @param {Array} contacts - Liste des contacts disponibles
+   * @param {Array} opportunities - Opportunités sélectionnées
+   * @returns {Object} Contacts recommandés regroupés par opportunité
+   */
+  identifyRecommendedContacts(contacts, opportunities) {
+    if (!contacts || !opportunities || opportunities.length === 0) return {};
+
+    const recommendationsByOpportunity = {};
+
+    // Pour chaque opportunité, identifier les contacts les plus pertinents
+    opportunities.forEach(opportunity => {
+      const opportunityKey = `${opportunity.category}-${opportunity.detail}`;
+      const recommendedContacts = this.identifyRecommendedContactsForOpportunity(contacts, opportunity);
+      
+      recommendationsByOpportunity[opportunityKey] = {
+        opportunity,
+        contacts: recommendedContacts
+      };
+    });
+
+    // Notifier les abonnés
+    this._notifyRecommendedContactsSubscribers(recommendationsByOpportunity);
+
+    return recommendationsByOpportunity;
   }
 
-  // Normaliser le score final entre 0 et 1
-  return Math.min(1, totalScore);
-}
-
-/**
- * Identifie les contacts recommandés pour une opportunité spécifique
- * @param {Array} contacts - Liste des contacts disponibles
- * @param {Object} opportunity - L'opportunité sélectionnée (un seul objet)
- * @returns {Array} Contacts recommandés pour cette opportunité
- */
-identifyRecommendedContactsForOpportunity(contacts, opportunity) {
-  if (!contacts || !opportunity) return [];
-
-  // Calculer et filtrer les contacts pour cette opportunité spécifique
-  const recommendedContacts = contacts
-    .map((contact) => ({
-      ...contact,
-      relevanceScore: this.calculateContactRelevanceForOpportunity(contact, opportunity),
-    }))
-    // Filtrer les contacts vraiment pertinents pour cette opportunité (seuil plus élevé)
-    .filter(
-      (contact) =>
-        contact.relevanceScore > 0.4 && // Seuil adapté pour la pertinence par opportunité
-        (contact.email || contact.phone) &&
-        contact.role !== "Poste non spécifié"
-    )
-    // Trier par score de pertinence décroissant
-    .sort((a, b) => b.relevanceScore - a.relevanceScore)
-    // Limiter à 10 contacts maximum par opportunité
-    .slice(0, 10);
-
-  return recommendedContacts;
-}
-
-/**
- * Identifie les contacts recommandés pour une liste d'opportunités
- * @param {Array} contacts - Liste des contacts disponibles
- * @param {Array} opportunities - Opportunités sélectionnées
- * @returns {Object} Contacts recommandés regroupés par opportunité
- */
-identifyRecommendedContacts(contacts, opportunities) {
-  if (!contacts || !opportunities || opportunities.length === 0) return {};
-
-  const recommendationsByOpportunity = {};
-
-  // Pour chaque opportunité, identifier les contacts les plus pertinents
-  opportunities.forEach(opportunity => {
-    const opportunityKey = `${opportunity.category}-${opportunity.detail}`;
-    const recommendedContacts = this.identifyRecommendedContactsForOpportunity(contacts, opportunity);
-    
-    recommendationsByOpportunity[opportunityKey] = {
-      opportunity,
-      contacts: recommendedContacts
-    };
-  });
-
-  // Notifier les abonnés
-  this._notifyRecommendedContactsSubscribers(recommendationsByOpportunity);
-
-  return recommendationsByOpportunity;
-}
   /**
    * Désélectionne une opportunité de prospection
    * @param {Object} opportunity - L'opportunité à désélectionner
