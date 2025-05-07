@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import * as React from "react";
+const { useState, useCallback, useMemo } = React;
 import NewsCard from "./NewsCard";
 import LoadingSpinner from "./LoadingSpinner";
 import { WarningIcon } from "./Icons";
