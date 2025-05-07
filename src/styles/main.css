@@ -2876,3 +2876,161 @@ svg {
   padding-top: 10px;
   padding-bottom: 10px;
 }
+
+/* Styles pour les éléments d'analyse Claude */
+.premium-claude-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.premium-ai-summary {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #6366f1;
+}
+
+.premium-ai-summary h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #6366f1;
+}
+
+.premium-ai-summary p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Styles pour les sections d'insights dans les modales */
+.claude-insights-section {
+  padding: 20px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 12px;
+  margin: 24px 0;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.insights-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #6366f1;
+}
+
+.insights-block {
+  margin-bottom: 20px;
+}
+
+.insights-block h4 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.insights-block p, .insights-block li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.insights-block ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.insights-block li {
+  margin-bottom: 8px;
+}
+
+.insights-block li:last-child {
+  margin-bottom: 0;
+}
+
+/* Animation de chargement spécifique pour l'analyse IA */
+.ai-loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6366f1;
+  font-size: 14px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.claude-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.claude-summary-panel, .claude-opportunities-panel {
+  margin: 16px 0;
+  padding: 16px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #6366f1;
+}
+
+.claude-summary-panel h4, .claude-opportunities-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #6366f1;
+}
+
+.claude-summary-panel p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.claude-opportunities-panel ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.claude-opportunities-panel li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.claude-opportunities-panel li:last-child {
+  margin-bottom: 0;
+}
