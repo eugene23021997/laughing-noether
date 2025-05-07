@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import * as React from "react";
+const { useState, useCallback, useEffect, useMemo, useRef } = React;
 import { contactService } from "../services/contactService";
 import { prospectionService } from "../services/prospectionService";
 import ContactList from "./ContactList";
