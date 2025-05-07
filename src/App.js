@@ -2,10 +2,12 @@ import * as React from "react";
 const { useState, useEffect, useMemo, useRef } = React;
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
+import { contactService } from "./services/contactService";
 import MatrixTabContent from "./components/MatrixTabContent";
 import ServiceLineTabContent from "./components/ServiceLineTabContent.js";
 import ContactTabContent from "./components/ContactTabContent";
 import LoadingSpinner from "./components/LoadingSpinner";
+
 // Modification du chemin d'import pour les styles
 import "./styles/main.css";
 
