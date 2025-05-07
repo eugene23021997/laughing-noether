@@ -1,10 +1,12 @@
+// src/components/NewsCard.js - Version modifiée pour mettre en évidence les analyses Claude
+
 import React, { useState, useEffect } from "react";
 import { prospectionService } from "../services/prospectionService";
 import OpportunityModal from "./OpportunityModal";
 
 /**
  * Composant pour afficher une carte d'actualité avec possibilité de voir les détails des opportunités
- * Version améliorée: détails des offres masqués et visibles uniquement dans la modale
+ * Version améliorée: mise en évidence des analyses Claude
  *
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.news - L'actualité à afficher
@@ -19,6 +21,8 @@ const NewsCard = ({ news, contacts = [] }) => {
     newsDescription,
     newsLink,
     offers,
+    analyzed, // Propriété indiquant si l'article a été analysé par Claude
+    insights, // Insights générés par Claude
   } = news;
 
   // État pour le modal
@@ -107,21 +111,36 @@ const NewsCard = ({ news, contacts = [] }) => {
       .slice(0, 3);
   };
 
+  // Vérifier si l'article a été analysé par Claude
+  const hasClaudeAnalysis = analyzed && insights;
+
   return (
     <>
       <div
         className={`premium-news-card ${
           hasHighPotential ? "high-potential" : ""
-        }`}
+        } ${hasClaudeAnalysis ? "claude-analyzed" : ""}`}
         style={{
           cursor: "pointer",
-          borderLeft: hasHighPotential ? "4px solid #ec4899" : "none",
+          borderLeft: hasHighPotential ? "4px solid #ec4899" : 
+                     hasClaudeAnalysis ? "4px solid #6366f1" : "none",
           transition: "all 0.3s ease",
           position: "relative",
           overflow: "hidden",
         }}
         onClick={openModal}
       >
+        {/* Indicateur d'analyse Claude */}
+        {hasClaudeAnalysis && (
+          <div className="claude-indicator">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#6366f1" strokeWidth="2" />
+              <path d="M12 16L16 11H13V8L9 13H12V16Z" stroke="#6366f1" strokeWidth="2" />
+            </svg>
+            <span>Analysé par Claude</span>
+          </div>
+        )}
+
         <div className="premium-news-card-content">
           {/* En-tête de la carte - Date et indicateur de potentiel */}
           <div
@@ -231,8 +250,15 @@ const NewsCard = ({ news, contacts = [] }) => {
             </div>
           )}
 
-          {/* Description courte (aperçu) */}
-          {newsDescription && (
+          {/* Résumé Claude si disponible */}
+          {hasClaudeAnalysis && insights.summary && (
+            <div className="claude-summary">
+              <p>{insights.summary}</p>
+            </div>
+          )}
+
+          {/* Description courte (aperçu) si pas d'analyse Claude */}
+          {!hasClaudeAnalysis && newsDescription && (
             <p
               className="premium-news-description"
               style={{
@@ -395,7 +421,7 @@ const NewsCard = ({ news, contacts = [] }) => {
         contacts={contacts}
       />
 
-      {/* Styles locaux */}
+      {/* Styles spécifiques pour les cartes analysées par Claude */}
       <style jsx>{`
         .premium-news-card {
           transition: all 0.3s ease;
@@ -412,6 +438,46 @@ const NewsCard = ({ news, contacts = [] }) => {
 
         .premium-news-card.high-potential:hover {
           box-shadow: 0 8px 25px rgba(236, 72, 153, 0.2);
+        }
+        
+        .premium-news-card.claude-analyzed {
+          box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+          background: linear-gradient(to right, rgba(99, 102, 241, 0.03), transparent);
+        }
+        
+        .premium-news-card.claude-analyzed:hover {
+          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+        }
+        
+        .claude-indicator {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background-color: rgba(99, 102, 241, 0.1);
+          border-radius: 20px;
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #6366f1;
+        }
+        
+        .claude-summary {
+          margin-top: 12px;
+          padding: 12px;
+          background-color: rgba(99, 102, 241, 0.05);
+          border-radius: 8px;
+          border-left: 3px solid #6366f1;
+        }
+        
+        .claude-summary p {
+          margin: 0;
+          font-size: 14px;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          font-style: italic;
         }
       `}</style>
     </>
