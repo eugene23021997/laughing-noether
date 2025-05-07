@@ -275,32 +275,31 @@ const App = () => {
     fetchRssNews();
   }, [data]);
 
+  // Dans src/App.js, modifier la fonction fetchRssNews pour intégrer l'analyse Claude
+
   const fetchRssNews = async () => {
     setIsLoadingRss(true);
     try {
-      // Récupérer les actualités RSS
+      // Récupérer les actualités RSS avec l'analyse Claude
       const news = await rssFeedService.getAllNews();
       setRssNews(news);
-
+  
       // Analyser la pertinence des actualités par rapport aux offres
       const relevanceMatrix = rssFeedService.analyzeNewsRelevance(
         news,
         data.completeServiceLines
       );
       setRssRelevanceMatrix(relevanceMatrix);
-
+  
       // Mettre à jour la date de dernière mise à jour
       setLastRssUpdate(new Date());
-
-      // Extraire les contacts des actualités (CORRECTION ICI)
-      if (news && news.length > 0) {
-        // On utilise directement le service contactService pour extraire les contacts
-        // en fonction des actualités spécifiques à chaque offre
-        const extractedContacts = contactService.extractContactsFromNews(news);
-
-        // Stocker les contacts dans l'état
-        setContacts(extractedContacts);
-      }
+  
+      // Extraire les contacts des actualités en utilisant aussi ceux détectés par Claude
+      const extractedContacts = contactService.extractContactsFromNews(news);
+      setContacts(extractedContacts);
+      
+      // Afficher dans la console des informations sur l'analyse
+      console.log(`Analyse RSS terminée: ${news.length} actualités récupérées et ${news.filter(item => item.analyzed).length} analysées par IA`);
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des actualités RSS:",
@@ -310,7 +309,6 @@ const App = () => {
       setIsLoadingRss(false);
     }
   };
-
   // Filtrer la matrice par offre, terme de recherche et score de pertinence
   const filteredMatrix = useMemo(() => {
     return combinedRelevanceMatrix.filter((item) => {
