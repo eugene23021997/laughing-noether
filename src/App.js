@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import * as React from "react";
+const { useState, useEffect, useMemo, useRef } = React;
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
 import MatrixTabContent from "./components/MatrixTabContent";
@@ -283,23 +284,27 @@ const App = () => {
       // Récupérer les actualités RSS avec l'analyse Claude
       const news = await rssFeedService.getAllNews();
       setRssNews(news);
-  
+
       // Analyser la pertinence des actualités par rapport aux offres
       const relevanceMatrix = rssFeedService.analyzeNewsRelevance(
         news,
         data.completeServiceLines
       );
       setRssRelevanceMatrix(relevanceMatrix);
-  
+
       // Mettre à jour la date de dernière mise à jour
       setLastRssUpdate(new Date());
-  
+
       // Extraire les contacts des actualités en utilisant aussi ceux détectés par Claude
       const extractedContacts = contactService.extractContactsFromNews(news);
       setContacts(extractedContacts);
-      
+
       // Afficher dans la console des informations sur l'analyse
-      console.log(`Analyse RSS terminée: ${news.length} actualités récupérées et ${news.filter(item => item.analyzed).length} analysées par IA`);
+      console.log(
+        `Analyse RSS terminée: ${news.length} actualités récupérées et ${
+          news.filter((item) => item.analyzed).length
+        } analysées par IA`
+      );
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des actualités RSS:",
