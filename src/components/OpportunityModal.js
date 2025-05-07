@@ -534,13 +534,13 @@ const OpportunityModal = ({ newsData, isOpen, onClose, contacts = [] }) => {
             <h3 className="news-title">{newsData.news}</h3>
 
             <div className="news-meta">
-              <span className="news-date">{newsData.newsDate}</span>
-              {newsData.newsCategory && (
-                <span className="news-category">{newsData.newsCategory}</span>
+              <span className="news-date">{newsData.date}</span>
+              {newsData.category && (
+                <span className="news-category">{newsData.category}</span>
               )}
-              {newsData.newsLink && (
+              {newsData.link && (
                 <a
-                  href={newsData.newsLink}
+                  href={newsData.link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="news-link"
@@ -562,11 +562,84 @@ const OpportunityModal = ({ newsData, isOpen, onClose, contacts = [] }) => {
                   </svg>
                 </a>
               )}
+
+              {/* Badge pour indiquer que l'article a été analysé par Claude */}
+              {newsData.analyzed && (
+                <span className="claude-badge">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                      stroke="#6366f1"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M12 16L16 11H13V8L9 13H12V16Z"
+                      stroke="#6366f1"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                  Analysé par Claude
+                </span>
+              )}
             </div>
 
-            {newsData.newsDescription && (
-              <p className="news-description">{newsData.newsDescription}</p>
+            {/* Afficher la synthèse Claude si disponible */}
+            {newsData.analyzed &&
+              newsData.insights &&
+              newsData.insights.summary && (
+                <div className="claude-summary-panel">
+                  <h4>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                        stroke="#6366f1"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M12 16L16 11H13V8L9 13H12V16Z"
+                        stroke="#6366f1"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                    Synthèse IA
+                  </h4>
+                  <p>{newsData.insights.summary}</p>
+                </div>
+              )}
+
+            {/* Description originale */}
+            {newsData.description && (
+              <p className="news-description">{newsData.description}</p>
             )}
+
+            {/* Opportunités identifiées par Claude */}
+            {newsData.analyzed &&
+              newsData.insights &&
+              newsData.insights.opportunities &&
+              newsData.insights.opportunities.length > 0 && (
+                <div className="claude-opportunities-panel">
+                  <h4>Opportunités identifiées par Claude</h4>
+                  <ul>
+                    {newsData.insights.opportunities.map(
+                      (opportunity, index) => (
+                        <li key={index}>{opportunity}</li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
           </section>
 
           {/* Interface en deux colonnes pour les offres et détails */}
