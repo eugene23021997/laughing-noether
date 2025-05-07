@@ -1,5 +1,5 @@
-import React from "react";
-
+import * as React from "react";
+const { useState, useCallback, useEffect, useMemo, useRef } = React;
 /**
  * Composant de spinner de chargement personnalisé
  * @param {Object} props - Les propriétés du composant
