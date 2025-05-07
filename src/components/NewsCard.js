@@ -1,6 +1,7 @@
 // src/components/NewsCard.js - Version modifiée pour mettre en évidence les analyses Claude
 
-import React, { useState, useEffect } from "react";
+import * as React from "react";
+const { useState, useEffect, useCallback } = React;
 import { prospectionService } from "../services/prospectionService";
 import OpportunityModal from "./OpportunityModal";
 
@@ -122,8 +123,11 @@ const NewsCard = ({ news, contacts = [] }) => {
         } ${hasClaudeAnalysis ? "claude-analyzed" : ""}`}
         style={{
           cursor: "pointer",
-          borderLeft: hasHighPotential ? "4px solid #ec4899" : 
-                     hasClaudeAnalysis ? "4px solid #6366f1" : "none",
+          borderLeft: hasHighPotential
+            ? "4px solid #ec4899"
+            : hasClaudeAnalysis
+            ? "4px solid #6366f1"
+            : "none",
           transition: "all 0.3s ease",
           position: "relative",
           overflow: "hidden",
@@ -133,9 +137,23 @@ const NewsCard = ({ news, contacts = [] }) => {
         {/* Indicateur d'analyse Claude */}
         {hasClaudeAnalysis && (
           <div className="claude-indicator">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#6366f1" strokeWidth="2" />
-              <path d="M12 16L16 11H13V8L9 13H12V16Z" stroke="#6366f1" strokeWidth="2" />
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                stroke="#6366f1"
+                strokeWidth="2"
+              />
+              <path
+                d="M12 16L16 11H13V8L9 13H12V16Z"
+                stroke="#6366f1"
+                strokeWidth="2"
+              />
             </svg>
             <span>Analysé par Claude</span>
           </div>
@@ -439,16 +457,20 @@ const NewsCard = ({ news, contacts = [] }) => {
         .premium-news-card.high-potential:hover {
           box-shadow: 0 8px 25px rgba(236, 72, 153, 0.2);
         }
-        
+
         .premium-news-card.claude-analyzed {
           box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
-          background: linear-gradient(to right, rgba(99, 102, 241, 0.03), transparent);
+          background: linear-gradient(
+            to right,
+            rgba(99, 102, 241, 0.03),
+            transparent
+          );
         }
-        
+
         .premium-news-card.claude-analyzed:hover {
           box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
         }
-        
+
         .claude-indicator {
           display: flex;
           align-items: center;
@@ -463,7 +485,7 @@ const NewsCard = ({ news, contacts = [] }) => {
           font-weight: 500;
           color: #6366f1;
         }
-        
+
         .claude-summary {
           margin-top: 12px;
           padding: 12px;
@@ -471,7 +493,7 @@ const NewsCard = ({ news, contacts = [] }) => {
           border-radius: 8px;
           border-left: 3px solid #6366f1;
         }
-        
+
         .claude-summary p {
           margin: 0;
           font-size: 14px;
