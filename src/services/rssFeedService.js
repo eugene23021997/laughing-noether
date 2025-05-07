@@ -1,10 +1,11 @@
 /**
  * Service pour récupérer et parser les flux RSS de Schneider Electric
  * Utilise l'API RSS2JSON pour convertir les flux RSS en JSON
+ * Intègre l'analyse par l'API Claude pour l'extraction de contacts et d'insights commerciaux
  */
 
-// Suppression de l'import problématique
-// import { contactExtractionService } from "./contactExtractionService";
+import { claudeAnalysisService } from "./claudeAnalysisService";
+import { dataService } from "./dataService";
 
 // L'URL de l'API RSS2JSON (gratuite avec des limites, nécessite une inscription pour plus de requêtes)
 const RSS2JSON_API_URL = "https://api.rss2json.com/v1/api.json";
@@ -415,6 +416,59 @@ const KEYWORDS_BY_CATEGORY = {
   ],
 };
 
+/**
+ * Analyse les actualités avec Claude pour extraire des contacts et générer des insights
+ * @param {Array} news - Les actualités à analyser
+ * @returns {Promise<Array>} - Les actualités enrichies avec l'analyse Claude
+ */
+async function analyzeNewsWithClaude(news) {
+  try {
+    console.log("Début de l'analyse des actualités avec Claude");
+    
+    // Récupérer les offres BearingPoint pour l'analyse
+    const bpOffers = dataService.getData().bpOffers;
+    
+    // Limiter le nombre d'articles à analyser pour éviter des coûts élevés
+    // en production, vous pourriez vouloir analyser tous les articles
+    const articlesToAnalyze = news.slice(0, 10); // Analyser seulement les 10 premiers articles
+    
+    // Analyser les articles avec Claude
+    const analysisResults = await claudeAnalysisService.batchAnalyzeArticles(articlesToAnalyze, bpOffers);
+    
+    console.log(`Analyse terminée pour ${analysisResults.length} articles`);
+    
+    // Enrichir les actualités originales avec les résultats de l'analyse
+    const enrichedNews = news.map(newsItem => {
+      // Chercher si cet article a été analysé
+      const analysis = analysisResults.find(result => 
+        result.article.title === newsItem.title || 
+        (result.article.link && result.article.link === newsItem.link)
+      );
+      
+      if (analysis) {
+        // Enrichir avec les données d'analyse
+        return {
+          ...newsItem,
+          contacts: analysis.contacts || [],
+          insights: analysis.insights || {},
+          analyzed: true
+        };
+      }
+      
+      // Retourner l'article original si pas d'analyse
+      return newsItem;
+    });
+    
+    console.log(`${enrichedNews.filter(item => item.analyzed).length} actualités enrichies avec l'analyse Claude`);
+    
+    return enrichedNews;
+  } catch (error) {
+    console.error("Erreur lors de l'analyse des actualités avec Claude:", error);
+    // En cas d'erreur, retourner les actualités originales sans enrichissement
+    return news;
+  }
+}
+
 // Fonction pour récupérer les actualités d'un flux RSS
 async function fetchRssFeed(rssUrl) {
   try {
@@ -542,6 +596,7 @@ function isRelevantToSchneider(newsItem) {
     content.includes(keyword.toLowerCase())
   );
 }
+
 // Fonction pour récupérer toutes les actualités de tous les flux RSS
 async function getAllNews() {
   try {
@@ -589,10 +644,15 @@ async function getAllNews() {
     );
 
     // Trier par date (du plus récent au plus ancien)
-    return uniqueNews.sort((a, b) => b.pubDateTimestamp - a.pubDateTimestamp);
+    const sortedNews = uniqueNews.sort((a, b) => b.pubDateTimestamp - a.pubDateTimestamp);
+    
+    // Analyser les actualités avec Claude pour extraire contacts et insights
+    const analyzedNews = await analyzeNewsWithClaude(sortedNews);
+    
+    return analyzedNews;
   } catch (error) {
     console.error(
-      "Erreur lors de la récupération de toutes les actualités:",
+      "Erreur lors de la récupération et de l'analyse des actualités:",
       error
     );
     return [];
@@ -606,94 +666,118 @@ function analyzeNewsRelevance(news, offers) {
 
     // Pour chaque actualité
     news.forEach((newsItem) => {
-      // Texte de l'actualité en minuscules pour la recherche
-      const newsText = `${newsItem.title} ${newsItem.description || ""} ${
-        newsItem.category || ""
-      }`.toLowerCase();
-
-      // Pour chaque catégorie d'offre
-      Object.entries(KEYWORDS_BY_CATEGORY).forEach(([category, keywords]) => {
-        // Compter combien de mots clés sont présents dans l'actualité
-        let matchCount = 0;
-        let matchedKeywords = [];
-
-        keywords.forEach((keyword) => {
-          if (newsText.includes(keyword.toLowerCase())) {
-            matchCount++;
-            matchedKeywords.push(keyword);
-          }
-        });
-
-        // Calculer un score de pertinence de 1 à 3
-        let relevanceScore = 0;
-        if (matchCount > 5) {
-          // Augmenter le seuil pour un score élevé
-          relevanceScore = 3; // Très pertinent
-        } else if (matchCount > 2) {
-          // Ajuster le seuil intermédiaire
-          relevanceScore = 2; // Pertinent
-        } else if (matchCount > 0) {
-          relevanceScore = 1; // Légèrement pertinent
-        }
-
-        // Facteur d'ajustement basé sur la spécificité des mots clés
-        // Les mots-clés plus spécifiques ont plus de poids
-        let specificityFactor = 0;
-        matchedKeywords.forEach((keyword) => {
-          // Les termes plus longs sont généralement plus spécifiques
-          if (keyword.length > 8) specificityFactor += 0.1;
-
-          // Les termes techniques ont plus de poids
-          const technicalTerms = [
-            "erp",
-            "crm",
-            "analytics",
-            "cloud",
-            "cybersécurité",
-            "ia",
-            "ai",
-          ];
-          if (technicalTerms.includes(keyword.toLowerCase()))
-            specificityFactor += 0.2;
-        });
-
-        // Ajuster le score en fonction de la spécificité (mais pas au-delà de 3)
-        relevanceScore = Math.min(3, relevanceScore * (1 + specificityFactor));
-
-        // Si au moins un mot clé a été trouvé, ajouter à la matrice
-        if (relevanceScore > 0) {
-          // Trouver les offres détaillées correspondantes
-          const matchedOffers = [];
-
-          // Parcourir les offres détaillées pour trouver celles qui correspondent aux mots clés
-          Object.entries(offers).forEach(([serviceLine, serviceOfferings]) => {
-            if (serviceLine === category) {
-              serviceOfferings.forEach((offering) => {
-                // Vérifier si le nom de l'offre contient l'un des mots clés correspondants
-                const offeringLower = offering.toLowerCase();
-                if (
-                  matchedKeywords.some((keyword) =>
-                    offeringLower.includes(keyword.toLowerCase())
-                  )
-                ) {
-                  matchedOffers.push(offering);
-                }
-              });
-            }
-          });
-
+      // Si l'actualité a été analysée par Claude, utiliser ses insights
+      if (newsItem.analyzed && newsItem.insights && newsItem.insights.recommendedOffers) {
+        // Utiliser le score de pertinence de Claude (1-3)
+        const relevanceScore = Math.min(3, Math.max(1, newsItem.insights.relevanceScore || 1));
+        
+        // Ajouter une entrée dans la matrice pour chaque offre recommandée
+        newsItem.insights.recommendedOffers.forEach(recommendation => {
           relevanceMatrix.push({
             news: newsItem.title,
             newsDate: newsItem.date,
             newsCategory: newsItem.category,
             newsDescription: newsItem.description,
             newsLink: newsItem.link,
-            offerCategory: category,
-            relevanceScore: Math.round(relevanceScore), // Arrondir pour maintenir des valeurs entières 1, 2 ou 3
-            offerDetail: matchedOffers.join(", ") || category,
+            offerCategory: recommendation.category,
+            relevanceScore: relevanceScore,
+            offerDetail: recommendation.offer,
+            aiSummary: newsItem.insights.summary,
+            aiOpportunities: newsItem.insights.opportunities,
+            aiApproach: newsItem.insights.approachSuggestions
           });
-        }
-      });
+        });
+      } else {
+        // Méthode traditionnelle d'analyse par mots-clés
+        // Texte de l'actualité en minuscules pour la recherche
+        const newsText = `${newsItem.title} ${newsItem.description || ""} ${
+          newsItem.category || ""
+        }`.toLowerCase();
+
+        // Pour chaque catégorie d'offre
+        Object.entries(KEYWORDS_BY_CATEGORY).forEach(([category, keywords]) => {
+          // Compter combien de mots clés sont présents dans l'actualité
+          let matchCount = 0;
+          let matchedKeywords = [];
+
+          keywords.forEach((keyword) => {
+            if (newsText.includes(keyword.toLowerCase())) {
+              matchCount++;
+              matchedKeywords.push(keyword);
+            }
+          });
+
+          // Calculer un score de pertinence de 1 à 3
+          let relevanceScore = 0;
+          if (matchCount > 5) {
+            // Augmenter le seuil pour un score élevé
+            relevanceScore = 3; // Très pertinent
+          } else if (matchCount > 2) {
+            // Ajuster le seuil intermédiaire
+            relevanceScore = 2; // Pertinent
+          } else if (matchCount > 0) {
+            relevanceScore = 1; // Légèrement pertinent
+          }
+
+          // Facteur d'ajustement basé sur la spécificité des mots clés
+          // Les mots-clés plus spécifiques ont plus de poids
+          let specificityFactor = 0;
+          matchedKeywords.forEach((keyword) => {
+            // Les termes plus longs sont généralement plus spécifiques
+            if (keyword.length > 8) specificityFactor += 0.1;
+
+            // Les termes techniques ont plus de poids
+            const technicalTerms = [
+              "erp",
+              "crm",
+              "analytics",
+              "cloud",
+              "cybersécurité",
+              "ia",
+              "ai",
+            ];
+            if (technicalTerms.includes(keyword.toLowerCase()))
+              specificityFactor += 0.2;
+          });
+
+          // Ajuster le score en fonction de la spécificité (mais pas au-delà de 3)
+          relevanceScore = Math.min(3, relevanceScore * (1 + specificityFactor));
+
+          // Si au moins un mot clé a été trouvé, ajouter à la matrice
+          if (relevanceScore > 0) {
+            // Trouver les offres détaillées correspondantes
+            const matchedOffers = [];
+
+            // Parcourir les offres détaillées pour trouver celles qui correspondent aux mots clés
+            Object.entries(offers).forEach(([serviceLine, serviceOfferings]) => {
+              if (serviceLine === category) {
+                serviceOfferings.forEach((offering) => {
+                  // Vérifier si le nom de l'offre contient l'un des mots clés correspondants
+                  const offeringLower = offering.toLowerCase();
+                  if (
+                    matchedKeywords.some((keyword) =>
+                      offeringLower.includes(keyword.toLowerCase())
+                    )
+                  ) {
+                    matchedOffers.push(offering);
+                  }
+                });
+              }
+            });
+
+            relevanceMatrix.push({
+              news: newsItem.title,
+              newsDate: newsItem.date,
+              newsCategory: newsItem.category,
+              newsDescription: newsItem.description,
+              newsLink: newsItem.link,
+              offerCategory: category,
+              relevanceScore: Math.round(relevanceScore), // Arrondir pour maintenir des valeurs entières 1, 2 ou 3
+              offerDetail: matchedOffers.join(", ") || category,
+            });
+          }
+        });
+      }
     });
 
     return relevanceMatrix;
@@ -705,3 +789,11 @@ function analyzeNewsRelevance(news, offers) {
     return [];
   }
 }
+
+// Exporter le service
+export const rssFeedService = {
+  getAllNews,
+  analyzeNewsRelevance,
+  analyzeNewsWithClaude, // Nouvelle fonction exportée
+  fetchRssFeed
+};
