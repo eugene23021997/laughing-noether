@@ -3,22 +3,20 @@ const path = require("path");
 const cors = require("cors");
 require("dotenv").config();
 
-// 1. CRÉER L'APPLICATION EXPRESS D'ABORD
+// Créer l'application Express
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 2. CONFIGURATION DES MIDDLEWARES
+// Configuration des middlewares
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "build")));
 
-// 3. INITIALISATION DE L'API ANTHROPIC
+// Initialisation de l'API Anthropic
 const Anthropic = require("@anthropic-ai/sdk");
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// 4. ROUTES API
 
 // Route API pour Claude
 app.post("/api/claude", async (req, res) => {
@@ -33,11 +31,13 @@ app.post("/api/claude", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    console.log("🤖 Requête Claude reçue:", {
-      model,
-      promptLength: prompt.length,
-      maxTokens: max_tokens,
-    });
+    if (process.env.LOG_CLAUDE_REQUESTS === "true") {
+      console.log("🤖 Requête Claude:", {
+        model,
+        promptLength: prompt.length,
+        maxTokens: max_tokens,
+      });
+    }
 
     const response = await anthropic.messages.create({
       model: model,
@@ -45,10 +45,12 @@ app.post("/api/claude", async (req, res) => {
       messages: [{ role: "user", content: prompt }],
     });
 
-    console.log("✅ Réponse Claude reçue:", {
-      responseLength: response.content[0].text.length,
-      usage: response.usage,
-    });
+    if (process.env.LOG_CLAUDE_REQUESTS === "true") {
+      console.log("✅ Réponse Claude:", {
+        responseLength: response.content[0].text.length,
+        usage: response.usage,
+      });
+    }
 
     res.json({
       content: response.content[0].text,
@@ -79,54 +81,11 @@ app.post("/api/claude", async (req, res) => {
   }
 });
 
-// Route pour tester la clé API
-app.get("/api/test-claude", async (req, res) => {
-  try {
-    console.log("🔍 Test de la clé API Claude...");
-
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({
-        error: "Clé API non configurée",
-        details:
-          "ANTHROPIC_API_KEY non trouvée dans les variables d'environnement",
-      });
-    }
-
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 100,
-      messages: [
-        {
-          role: "user",
-          content: 'Répondre simplement: "API Claude fonctionnelle"',
-        },
-      ],
-    });
-
-    console.log("✅ Test API Claude réussi");
-
-    res.json({
-      success: true,
-      message: "Clé API Claude fonctionnelle",
-      response: response.content[0].text,
-      usage: response.usage,
-    });
-  } catch (error) {
-    console.error("❌ Test API Claude échoué:", error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      status: error.status || "unknown",
-    });
-  }
-});
-
-// Route de test simple
+// Route de test de l'API
 app.get("/api/test", (req, res) => {
   res.json({
     success: true,
-    message: "API BearingPoint opérationnelle !",
+    message: "API BearingPoint opérationnelle",
     timestamp: new Date().toISOString(),
     server: {
       port: PORT,
@@ -144,72 +103,85 @@ app.get("/", (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BearingPoint - API Claude</title>
+        <title>BearingPoint - Suivi de compte</title>
         <style>
             body { 
-                font-family: Arial, sans-serif; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
                 margin: 0; 
                 padding: 40px; 
-                background: #f5f5f5; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
             }
             .container { 
                 max-width: 800px; 
                 margin: 0 auto; 
-                background: white; 
-                padding: 30px; 
-                border-radius: 10px; 
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+                background: rgba(255, 255, 255, 0.1); 
+                padding: 40px; 
+                border-radius: 20px; 
+                backdrop-filter: blur(10px);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             }
-            h1 { color: #e31e24; text-align: center; }
-            .status { 
-                padding: 15px; 
-                margin: 15px 0; 
-                border-radius: 5px; 
-                border-left: 4px solid #28a745;
-                background: #d4edda; 
-                color: #155724; 
-            }
-            .btn { 
-                display: inline-block; 
-                padding: 10px 20px; 
-                margin: 10px 5px; 
-                background: #e31e24; 
+            h1 { 
                 color: white; 
-                text-decoration: none; 
-                border-radius: 5px; 
+                text-align: center; 
+                margin-bottom: 30px;
+                font-size: 2.5em;
             }
-            .btn:hover { background: #c41e3a; }
+            .status { 
+                padding: 20px; 
+                margin: 20px 0; 
+                border-radius: 10px; 
+                background: rgba(76, 175, 80, 0.2);
+                border: 1px solid rgba(76, 175, 80, 0.3);
+                color: #c8e6c9;
+            }
             .info { 
-                background: #f8f9fa; 
-                padding: 15px; 
-                border-radius: 5px; 
-                margin: 15px 0; 
+                background: rgba(255, 255, 255, 0.1); 
+                padding: 20px; 
+                border-radius: 10px; 
+                margin: 20px 0; 
+                backdrop-filter: blur(5px);
+            }
+            .feature {
+                margin: 15px 0;
+                padding: 10px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .feature:last-child {
+                border-bottom: none;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>🚀 BearingPoint - API Claude</h1>
+            <h1>🚀 BearingPoint - Suivi de compte</h1>
             
             <div class="status">
-                ✅ Serveur Express opérationnel !
+                ✅ Application opérationnelle
             </div>
             
             <div class="info">
-                <strong>📊 Informations:</strong><br>
-                • Port: ${PORT}<br>
-                • Environnement: ${process.env.NODE_ENV || "development"}<br>
-                • Node.js: ${process.version}<br>
-                • API Claude: ${
+                <h3>📊 Informations système</h3>
+                <div class="feature">Port: ${PORT}</div>
+                <div class="feature">Environnement: ${
+                  process.env.NODE_ENV || "development"
+                }</div>
+                <div class="feature">Node.js: ${process.version}</div>
+                <div class="feature">API Claude: ${
                   process.env.ANTHROPIC_API_KEY
                     ? "✅ Configurée"
                     : "❌ Manquante"
-                }
+                }</div>
             </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-                <a href="/api/test" class="btn">Test API Simple</a>
-                <a href="/api/test-claude" class="btn">Test API Claude</a>
+
+            <div class="info">
+                <h3>🎯 Fonctionnalités</h3>
+                <div class="feature">📰 Analyse d'actualités Schneider Electric</div>
+                <div class="feature">🤖 Intelligence artificielle avec Claude</div>
+                <div class="feature">👥 Extraction et gestion de contacts</div>
+                <div class="feature">🎯 Identification d'opportunités commerciales</div>
+                <div class="feature">📊 Tableaux de bord analytiques</div>
             </div>
         </div>
     </body>
@@ -217,26 +189,23 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Servir l'application React (pour les autres routes)
+// Servir l'application React pour toutes les autres routes
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
-// 5. DÉMARRAGE DU SERVEUR (UNE SEULE FOIS !)
+// Démarrage du serveur
 app.listen(PORT, () => {
   console.log("🚀 ===============================================");
-  console.log(`🚀 Serveur BearingPoint démarré sur le port ${PORT}`);
-  console.log(`🌐 Application disponible: http://localhost:${PORT}`);
+  console.log(`🚀 Application BearingPoint démarrée sur le port ${PORT}`);
+  console.log(`🌐 Application: http://localhost:${PORT}`);
   console.log(`📡 API Claude: http://localhost:${PORT}/api/claude`);
-  console.log(`🔍 Test API Claude: http://localhost:${PORT}/api/test-claude`);
   console.log("🚀 ===============================================");
 
-  // Vérifier la clé API au démarrage
   if (process.env.ANTHROPIC_API_KEY) {
-    console.log("🔑 Clé API Anthropic configurée");
+    console.log("🔑 API Claude configurée");
   } else {
-    console.error("❌ Clé API Anthropic manquante!");
-    console.log("💡 Ajoutez ANTHROPIC_API_KEY dans votre fichier .env");
+    console.warn("⚠️  Clé API Claude manquante - configurez ANTHROPIC_API_KEY");
   }
 });
 
