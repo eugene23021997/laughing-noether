@@ -1,19 +1,46 @@
-// src/services/claudeAnalysisService.js - Version complète intelligente
-import Anthropic from '@anthropic-ai/sdk';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const CLAUDE_MODEL = "claude-3-sonnet-20240229";
-
-const anthropic = new Anthropic({
-  apiKey: ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true
-});
+// src/services/claudeAnalysisService.js - Version corrigée pour utiliser l'API serveur
 
 class ClaudeAnalysisService {
   constructor() {
-    this.apiUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://3pv9tm-3000.csb.app/api/claude' 
-      : 'http://localhost:3000/api/claude';
+    this.apiUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://votre-domaine.com/api/claude" // Remplacez par votre domaine de production
+        : "http://localhost:3000/api/claude";
+
+    this.testUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://votre-domaine.com/api/test-claude"
+        : "http://localhost:3000/api/test-claude";
+  }
+
+  /**
+   * Teste la connexion à l'API Claude
+   * @returns {Promise<Object>} Résultat du test
+   */
+  async testConnection() {
+    try {
+      console.log("🔍 Test de connexion à l'API Claude...");
+
+      const response = await fetch(this.testUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("✅ Connexion API Claude réussie:", data);
+        return { success: true, data };
+      } else {
+        console.error("❌ Échec du test API Claude:", data);
+        return { success: false, error: data };
+      }
+    } catch (error) {
+      console.error("❌ Erreur lors du test de connexion:", error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
@@ -24,11 +51,21 @@ class ClaudeAnalysisService {
    */
   async analyzeArticleCompletely(article, bpOffers) {
     try {
+      console.log(`🤖 Analyse complète de l'article: "${article.title}"`);
+
       const prompt = this._buildCompleteAnalysisPrompt(article, bpOffers);
       const response = await this._callClaudeAPI(prompt);
-      return this._parseCompleteAnalysis(response);
+      const analysis = this._parseCompleteAnalysis(response);
+
+      console.log("✅ Analyse complète terminée:", {
+        contactsFound: analysis.contacts?.length || 0,
+        relevanceScore: analysis.relevanceScore,
+        hasInsights: !!analysis.insights,
+      });
+
+      return analysis;
     } catch (error) {
-      console.error("Erreur lors de l'analyse complète:", error);
+      console.error("❌ Erreur lors de l'analyse complète:", error);
       return this._getDefaultAnalysis();
     }
   }
@@ -41,33 +78,55 @@ class ClaudeAnalysisService {
    */
   async analyzeNewsRelevance(newsItems, bpOffers) {
     try {
-      console.log(`Analyse de pertinence Claude pour ${newsItems.length} actualités`);
+      console.log(
+        `🎯 Analyse de pertinence Claude pour ${newsItems.length} actualités`
+      );
       const relevanceMatrix = [];
-      
-      // Traiter les actualités par petits lots
+
+      // Traiter les actualités par petits lots pour éviter les timeouts
       const batchSize = 3;
       for (let i = 0; i < newsItems.length; i += batchSize) {
         const batch = newsItems.slice(i, i + batchSize);
-        
+        console.log(
+          `📊 Traitement du lot ${Math.floor(i / batchSize) + 1}/${Math.ceil(
+            newsItems.length / batchSize
+          )}`
+        );
+
         const batchPromises = batch.map(async (newsItem) => {
-          const prompt = this._buildRelevanceAnalysisPrompt(newsItem, bpOffers);
-          const response = await this._callClaudeAPI(prompt);
-          const analysis = this._parseRelevanceAnalysis(response, newsItem);
-          return analysis;
+          try {
+            const prompt = this._buildRelevanceAnalysisPrompt(
+              newsItem,
+              bpOffers
+            );
+            const response = await this._callClaudeAPI(prompt);
+            const analysis = this._parseRelevanceAnalysis(response, newsItem);
+            return analysis;
+          } catch (error) {
+            console.error(
+              `❌ Erreur pour l'actualité "${newsItem.title}":`,
+              error
+            );
+            return [];
+          }
         });
-        
+
         const batchResults = await Promise.all(batchPromises);
         relevanceMatrix.push(...batchResults.flat());
-        
+
         // Pause entre les lots
         if (i + batchSize < newsItems.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log("⏳ Pause entre les lots...");
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
-      
+
+      console.log(
+        `✅ Analyse de pertinence terminée: ${relevanceMatrix.length} entrées générées`
+      );
       return relevanceMatrix;
     } catch (error) {
-      console.error("Erreur lors de l'analyse de pertinence:", error);
+      console.error("❌ Erreur lors de l'analyse de pertinence:", error);
       return [];
     }
   }
@@ -79,22 +138,44 @@ class ClaudeAnalysisService {
    */
   async extractContactsFromNews(newsItems) {
     try {
-      console.log(`Extraction de contacts Claude pour ${newsItems.length} actualités`);
+      console.log(
+        `👥 Extraction de contacts Claude pour ${newsItems.length} actualités`
+      );
       const allContacts = [];
-      
-      for (const newsItem of newsItems) {
-        const prompt = this._buildContactExtractionPrompt(newsItem);
-        const response = await this._callClaudeAPI(prompt);
-        const contacts = this._parseContactsFromResponse(response, newsItem);
-        allContacts.push(...contacts);
-        
-        // Pause entre les requêtes
-        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      for (let i = 0; i < newsItems.length; i++) {
+        const newsItem = newsItems[i];
+        console.log(
+          `👤 Analyse contact ${i + 1}/${newsItems.length}: "${newsItem.title}"`
+        );
+
+        try {
+          const prompt = this._buildContactExtractionPrompt(newsItem);
+          const response = await this._callClaudeAPI(prompt);
+          const contacts = this._parseContactsFromResponse(response, newsItem);
+          allContacts.push(...contacts);
+
+          // Pause entre les requêtes
+          if (i < newsItems.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(
+            `❌ Erreur extraction contact pour "${newsItem.title}":`,
+            error
+          );
+          continue;
+        }
       }
-      
-      return this._deduplicateContacts(allContacts);
+
+      const deduplicatedContacts = this._deduplicateContacts(allContacts);
+      console.log(
+        `✅ Extraction terminée: ${deduplicatedContacts.length} contacts uniques`
+      );
+
+      return deduplicatedContacts;
     } catch (error) {
-      console.error("Erreur lors de l'extraction de contacts:", error);
+      console.error("❌ Erreur lors de l'extraction de contacts:", error);
       return [];
     }
   }
@@ -107,27 +188,93 @@ class ClaudeAnalysisService {
    */
   async analyzeContactRelevance(contacts, opportunities) {
     try {
-      console.log(`Analyse de pertinence des contacts pour ${opportunities.length} opportunités`);
+      console.log(
+        `🎯 Analyse de pertinence des contacts pour ${opportunities.length} opportunités`
+      );
       const recommendations = {};
-      
-      for (const opportunity of opportunities) {
-        const prompt = this._buildContactRelevancePrompt(contacts, opportunity);
-        const response = await this._callClaudeAPI(prompt);
-        const analysis = this._parseContactRelevance(response, opportunity);
-        
-        const opportunityKey = `${opportunity.category}-${opportunity.detail}`;
-        recommendations[opportunityKey] = {
-          opportunity,
-          contacts: analysis.contacts || []
-        };
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      for (let i = 0; i < opportunities.length; i++) {
+        const opportunity = opportunities[i];
+        console.log(
+          `🔍 Analyse ${i + 1}/${opportunities.length}: "${opportunity.detail}"`
+        );
+
+        try {
+          const prompt = this._buildContactRelevancePrompt(
+            contacts,
+            opportunity
+          );
+          const response = await this._callClaudeAPI(prompt);
+          const analysis = this._parseContactRelevance(response, opportunity);
+
+          const opportunityKey = `${opportunity.category}-${opportunity.detail}`;
+          recommendations[opportunityKey] = {
+            opportunity,
+            contacts: analysis.contacts || [],
+          };
+
+          // Pause entre les analyses
+          if (i < opportunities.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(
+            `❌ Erreur analyse opportunité "${opportunity.detail}":`,
+            error
+          );
+          continue;
+        }
       }
-      
+
+      console.log(
+        `✅ Analyse de pertinence terminée: ${
+          Object.keys(recommendations).length
+        } recommandations`
+      );
       return recommendations;
     } catch (error) {
-      console.error("Erreur lors de l'analyse de pertinence des contacts:", error);
+      console.error(
+        "❌ Erreur lors de l'analyse de pertinence des contacts:",
+        error
+      );
       return {};
+    }
+  }
+
+  /**
+   * Appelle l'API Claude via le serveur Express
+   * @private
+   */
+  async _callClaudeAPI(
+    prompt,
+    model = "claude-3-5-sonnet-20241022",
+    maxTokens = 4000
+  ) {
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          model,
+          max_tokens: maxTokens,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `API Error ${response.status}: ${errorData.error || "Unknown error"}`
+        );
+      }
+
+      const data = await response.json();
+      return data.content;
+    } catch (error) {
+      console.error("❌ Erreur lors de l'appel à l'API Claude:", error);
+      throw error;
     }
   }
 
@@ -137,8 +284,11 @@ class ClaudeAnalysisService {
    */
   _buildCompleteAnalysisPrompt(article, bpOffers) {
     const offersString = Object.entries(bpOffers)
-      .map(([category, offers]) => `${category}:\n${offers.map(offer => `  - ${offer}`).join('\n')}`)
-      .join('\n\n');
+      .map(
+        ([category, offers]) =>
+          `${category}:\n${offers.map((offer) => `  - ${offer}`).join("\n")}`
+      )
+      .join("\n\n");
 
     return `
 Tu es un expert en analyse commerciale pour BearingPoint. Analyse cet article concernant Schneider Electric et fournis une analyse complète.
@@ -209,8 +359,11 @@ Réponds au format JSON suivant:
    */
   _buildRelevanceAnalysisPrompt(newsItem, bpOffers) {
     const offersString = Object.entries(bpOffers)
-      .map(([category, offers]) => `${category}:\n${offers.map(offer => `  - ${offer}`).join('\n')}`)
-      .join('\n\n');
+      .map(
+        ([category, offers]) =>
+          `${category}:\n${offers.map((offer) => `  - ${offer}`).join("\n")}`
+      )
+      .join("\n\n");
 
     return `
 Tu es un expert en analyse commerciale. Analyse la pertinence de cette actualité Schneider Electric par rapport aux offres BearingPoint.
@@ -302,9 +455,14 @@ Réponds au format JSON suivant:
    * @private
    */
   _buildContactRelevancePrompt(contacts, opportunity) {
-    const contactsString = contacts.map(contact => 
-      `- ${contact.fullName || contact.name}: ${contact.role} (${contact.department || 'N/A'})`
-    ).join('\n');
+    const contactsString = contacts
+      .map(
+        (contact) =>
+          `- ${contact.fullName || contact.name}: ${contact.role} (${
+            contact.department || "N/A"
+          })`
+      )
+      .join("\n");
 
     return `
 Tu es un expert en prospection commerciale. Analyse ces contacts Schneider Electric pour identifier les plus pertinents pour cette opportunité BearingPoint.
@@ -312,8 +470,8 @@ Tu es un expert en prospection commerciale. Analyse ces contacts Schneider Elect
 OPPORTUNITÉ:
 Catégorie: ${opportunity.category}
 Offre: ${opportunity.detail}
-Contexte: ${opportunity.news || ''}
-Description: ${opportunity.newsDescription || ''}
+Contexte: ${opportunity.news || ""}
+Description: ${opportunity.newsDescription || ""}
 
 CONTACTS DISPONIBLES:
 ${contactsString}
@@ -352,24 +510,6 @@ Réponds au format JSON suivant:
   }
 
   /**
-   * Appelle l'API Claude
-   * @private
-   */
-  async _callClaudeAPI(prompt) {
-    try {
-      const response = await anthropic.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 4000,
-        messages: [{ role: "user", content: prompt }],
-      });
-      return response.content[0].text;
-    } catch (error) {
-      console.error("Erreur lors de l'appel à l'API Claude:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Parse l'analyse complète
    * @private
    */
@@ -394,11 +534,11 @@ Réponds au format JSON suivant:
           summary: parsed.summary,
           opportunities: parsed.opportunities,
           relevanceScore: parsed.relevanceScore,
-          recommendations: parsed.approachStrategy
-        }
+          recommendations: parsed.approachStrategy,
+        },
       };
     } catch (error) {
-      console.error("Erreur parsing analyse complète:", error);
+      console.error("❌ Erreur parsing analyse complète:", error);
       return this._getDefaultAnalysis();
     }
   }
@@ -416,8 +556,8 @@ Réponds au format JSON suivant:
       const matrix = [];
 
       if (parsed.relevantOffers && Array.isArray(parsed.relevantOffers)) {
-        parsed.relevantOffers.forEach(offerGroup => {
-          offerGroup.offers.forEach(offer => {
+        parsed.relevantOffers.forEach((offerGroup) => {
+          offerGroup.offers.forEach((offer) => {
             matrix.push({
               news: newsItem.title,
               newsDate: newsItem.date,
@@ -429,7 +569,7 @@ Réponds au format JSON suivant:
               relevanceScore: offerGroup.relevanceScore,
               justification: offerGroup.justification,
               opportunities: offerGroup.opportunities,
-              analyzed: true
+              analyzed: true,
             });
           });
         });
@@ -437,7 +577,7 @@ Réponds au format JSON suivant:
 
       return matrix;
     } catch (error) {
-      console.error("Erreur parsing pertinence:", error);
+      console.error("❌ Erreur parsing pertinence:", error);
       return [];
     }
   }
@@ -452,22 +592,24 @@ Réponds au format JSON suivant:
       if (!jsonMatch) return [];
 
       const parsed = JSON.parse(jsonMatch[0]);
-      
+
       if (!parsed.contacts || !Array.isArray(parsed.contacts)) {
         return [];
       }
 
-      return parsed.contacts.map(contact => ({
+      return parsed.contacts.map((contact) => ({
         ...contact,
-        sources: [{
-          title: newsItem.title,
-          date: newsItem.date,
-          link: newsItem.link || "",
-          extractionContext: contact.extractionContext
-        }]
+        sources: [
+          {
+            title: newsItem.title,
+            date: newsItem.date,
+            link: newsItem.link || "",
+            extractionContext: contact.extractionContext,
+          },
+        ],
       }));
     } catch (error) {
-      console.error("Erreur parsing contacts:", error);
+      console.error("❌ Erreur parsing contacts:", error);
       return [];
     }
   }
@@ -485,10 +627,10 @@ Réponds au format JSON suivant:
       return {
         contacts: parsed.contacts || [],
         analysisQuality: parsed.analysisQuality,
-        strategicInsights: parsed.strategicInsights
+        strategicInsights: parsed.strategicInsights,
       };
     } catch (error) {
-      console.error("Erreur parsing pertinence contacts:", error);
+      console.error("❌ Erreur parsing pertinence contacts:", error);
       return { contacts: [] };
     }
   }
@@ -499,8 +641,8 @@ Réponds au format JSON suivant:
    */
   _deduplicateContacts(contacts) {
     const contactMap = new Map();
-    
-    contacts.forEach(contact => {
+
+    contacts.forEach((contact) => {
       const key = (contact.fullName || contact.name || "").toLowerCase();
       if (key && !contactMap.has(key)) {
         contactMap.set(key, contact);
@@ -512,7 +654,7 @@ Réponds au format JSON suivant:
         }
       }
     });
-    
+
     return Array.from(contactMap.values());
   }
 
@@ -534,8 +676,8 @@ Réponds au format JSON suivant:
         summary: "",
         opportunities: [],
         relevanceScore: 0,
-        recommendations: []
-      }
+        recommendations: [],
+      },
     };
   }
 }
