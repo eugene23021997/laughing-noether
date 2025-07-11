@@ -25,7 +25,7 @@ function isPortFree(port) {
 }
 
 // Fonction pour trouver un port libre
-async function findFreePort(startPort = 3000) {
+async function findFreePort(startPort = 3001) {
   for (let port = startPort; port <= startPort + 10; port++) {
     const isFree = await isPortFree(port);
     if (isFree) {
