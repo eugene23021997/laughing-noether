@@ -9,7 +9,7 @@
     "claude",
     "analysis"
   ],
-  "main": "src/index.js",
+  "main": "server.js",
   "dependencies": {
     "loader-utils": "3.2.1",
     "react": "^18.2.0",
@@ -39,15 +39,21 @@
     "typescript": "4.4.4",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-server": "^4.15.1",
+    "concurrently": "^7.6.0",
+    "nodemon": "^3.0.1"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "react-scripts start",
+    "dev:server": "nodemon server.js",
+    "dev:full": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
-    "server": "node server.js"
+    "setup": "node start.js",
+    "clean": "pkill -f node || true",
+    "ports": "lsof -i :3000 && lsof -i :3001 && lsof -i :3002"
   },
   "browserslist": [
     ">0.2%",
@@ -57,5 +63,6 @@
   ],
   "engines": {
     "node": ">=14.0.0"
-  }
+  },
+  "proxy": "http://localhost:3002"
 }
