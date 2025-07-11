@@ -1,5 +1,4 @@
-import * as React from "react";
-const { useState, useEffect, useMemo, useRef } = React;
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
 import { contactService } from "./services/contactService";
